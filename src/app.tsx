@@ -547,6 +547,7 @@ export function App() {
       minute: '2-digit'
     });
   };
+  const [tempJwt, setTempJwt] = useState<string>('');
 
   const handleAuthSubmit = (e: Event) => {
     e.preventDefault();
