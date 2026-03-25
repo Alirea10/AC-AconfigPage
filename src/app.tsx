@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'preact/hooks';
-import { type Settings, type SeasonMeta, fetchSettings, updateSetting, fetchSeasons, uploadSeason, deleteSeason } from './api';
+import { useState, useEffect, useRef } from 'preact/hooks';
+import { type Settings, type SeasonMeta, fetchSettings, updateSetting, fetchSeasons, uploadSeason, deleteSeason, fetchCheatStatus, fetchChessList, executeCheatAction, type CheatConnection, type ChessItem, type BondItem } from './api';
 import { MAPS, NAME_CARDS } from './constants';
 import { SecretarySelector } from './SecretarySelector';
 
@@ -180,9 +180,296 @@ function SeasonManager({ jwt, myUserId, currentSeasonId, onSeasonChange }: {
   );
 }
 
+// ─── 作弊控制台组件 ─────────────────────────────────────────────────────────
+
+function CheatConsole({ jwt }: { jwt: string }) {
+  const [connections, setConnections] = useState<CheatConnection[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [chessListCache, setChessListCache] = useState<Record<string, { chars: ChessItem[]; traps: ChessItem[]; bonds: BondItem[] }>>({});
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [selectedPlayer, setSelectedPlayer] = useState<Record<string, string>>({});
+  const [coinValue, setCoinValue] = useState<Record<string, string>>({});
+  const [hpValue, setHpValue] = useState<Record<string, string>>({});
+  const [roundValue, setRoundValue] = useState<Record<string, string>>({});
+  const [bondId, setBondId] = useState<Record<string, string>>({});
+  const [bondCount, setBondCount] = useState<Record<string, string>>({});
+  const [chessId, setChessId] = useState<Record<string, string>>({});
+  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
+  const [actionResult, setActionResult] = useState<Record<string, { ok: boolean; msg: string } | null>>({});
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const poll = async () => {
+    try {
+      const data = await fetchCheatStatus(jwt);
+      setConnections(data);
+      setError(null);
+    } catch (e: any) {
+      setError(e.message);
+    }
+  };
+
+  useEffect(() => {
+    poll();
+    timerRef.current = setInterval(poll, 2000);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [jwt]);
+
+  const loadChessList = async (teamId: string) => {
+    if (chessListCache[teamId]) return;
+    try {
+      const data = await fetchChessList(jwt, teamId);
+      setChessListCache(prev => ({ ...prev, [teamId]: data }));
+    } catch (e: any) {
+      console.error('Failed to load chess list', e);
+    }
+  };
+
+  const toggleExpand = (teamId: string) => {
+    setExpanded(prev => {
+      const next = { ...prev, [teamId]: !prev[teamId] };
+      if (next[teamId]) loadChessList(teamId);
+      return next;
+    });
+  };
+
+  const showResult = (key: string, ok: boolean, msg: string) => {
+    setActionResult(prev => ({ ...prev, [key]: { ok, msg } }));
+    setTimeout(() => setActionResult(prev => ({ ...prev, [key]: null })), 3000);
+  };
+
+  const doAction = async (teamId: string, actionKey: string, userId: string, action: string, value?: any) => {
+    const key = `${teamId}_${actionKey}`;
+    setActionLoading(prev => ({ ...prev, [key]: true }));
+    try {
+      const result = await executeCheatAction(jwt, userId, action as any, value);
+      showResult(key, true, result.message);
+    } catch (e: any) {
+      showResult(key, false, e.message);
+    } finally {
+      setActionLoading(prev => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const ResultBadge = ({ k }: { k: string }) => {
+    const r = actionResult[k];
+    if (!r) return null;
+    return (
+      <span style={{ fontSize: '0.65rem', marginLeft: '8px', color: r.ok ? '#00ff9d' : '#ff4d4d' }}>
+        {r.ok ? '✓' : '✗'} {r.msg}
+      </span>
+    );
+  };
+
+  return (
+    <section class="cyber-section">
+      <h2 class="section-title" style={{ color: '#ff4d4d', borderBottomColor: '#ff4d4d' }}>
+        作弊控制台 <span style={{ color: '#ff4d4d' }}>CHEAT_SYS</span>
+      </h2>
+
+      <div style={{ fontSize: '0.7rem', opacity: 0.5, marginBottom: '12px' }}>
+        轮询间隔 2s · 在线连接：{connections.length} 个
+        {error && <span style={{ color: '#ff4d4d', marginLeft: '8px' }}>错误：{error}</span>}
+      </div>
+
+      {connections.length === 0 && !error && (
+        <div style={{ fontSize: '0.8rem', opacity: 0.4, textAlign: 'center', padding: '20px 0' }}>暂无在线连接</div>
+      )}
+
+      {connections.map(conn => {
+        const isExpanded = expanded[conn.teamId];
+        const chess = chessListCache[conn.teamId];
+        const selUid = selectedPlayer[conn.teamId] || conn.players[0]?.userId || conn.userId;
+        const selPlayer = conn.players.find(p => p.userId === selUid) ?? conn.players[0];
+
+        return (
+          <div key={conn.teamId} style={{ marginBottom: '16px', border: '1px solid rgba(255,77,77,0.2)', padding: '12px' }}>
+            {/* 连接头部 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginBottom: '8px' }}
+              onClick={() => toggleExpand(conn.teamId)}>
+              <span style={{
+                display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%',
+                background: conn.inBattle ? '#00ff9d' : '#ffaa00',
+                boxShadow: conn.inBattle ? '0 0 6px #00ff9d' : '0 0 6px #ffaa00',
+              }} />
+              <span style={{ fontWeight: 'bold', fontSize: '0.85rem' }}>{conn.nickname}</span>
+              <span style={{ fontSize: '0.65rem', opacity: 0.5 }}>
+                {conn.inBattle ? `对局中 R${conn.round}` : conn.teamState}
+              </span>
+              <span style={{ fontSize: '0.6rem', opacity: 0.3, marginLeft: 'auto' }}>
+                {conn.teamId.slice(0, 12)}...
+              </span>
+              <span style={{ fontSize: '0.7rem', opacity: 0.5 }}>{isExpanded ? '▲' : '▼'}</span>
+            </div>
+
+            {/* 玩家数据表 */}
+            {conn.players.length > 0 && (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.68rem', marginBottom: '8px' }}>
+                <thead>
+                  <tr style={{ opacity: 0.4 }}>
+                    {['#', '昵称', 'HP', '金币', '回合', '棋子', '状态'].map(h => (
+                      <th key={h} style={{ textAlign: 'left', padding: '2px 6px', fontWeight: 'normal' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {conn.players.map(p => (
+                    <tr key={p.uid} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                      <td style={{ padding: '3px 6px', opacity: 0.5 }}>{p.uidIndex}</td>
+                      <td style={{ padding: '3px 6px' }}>{p.nickName}</td>
+                      <td style={{ padding: '3px 6px', color: p.hp !== null && p.hp < 30 ? '#ff6b6b' : undefined }}>{p.hp ?? '—'}</td>
+                      <td style={{ padding: '3px 6px' }}>{p.coin ?? '—'}</td>
+                      <td style={{ padding: '3px 6px' }}>{p.round ?? '—'}</td>
+                      <td style={{ padding: '3px 6px' }}>{p.charChessCount}</td>
+                      <td style={{ padding: '3px 6px', fontSize: '0.6rem', opacity: 0.5 }}>{p.state ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
+            {/* 展开操作区 */}
+            {isExpanded && (
+              <div style={{ borderTop: '1px solid rgba(255,77,77,0.2)', paddingTop: '10px', marginTop: '6px' }}>
+                {/* 选择操作目标 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                  <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>操作目标</span>
+                  <select
+                    class="select-field"
+                    style={{ flex: 1, padding: '4px 8px', fontSize: '0.75rem' }}
+                    value={selUid}
+                    onChange={e => setSelectedPlayer(prev => ({ ...prev, [conn.teamId]: e.currentTarget.value }))}
+                  >
+                    {conn.players.map(p => (
+                      <option key={p.userId} value={p.userId}>{p.nickName} (#{p.uidIndex})</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 调整金币 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px dashed rgba(0,255,157,0.08)', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.7rem', opacity: 0.6, minWidth: '70px' }}>调整金币</span>
+                  <input class="input-field" type="number" min="0" max="999"
+                    style={{ width: '70px', padding: '3px 6px', fontSize: '0.75rem' }}
+                    placeholder={String(selPlayer?.coin ?? '')}
+                    value={coinValue[conn.teamId] ?? ''}
+                    onInput={e => setCoinValue(prev => ({ ...prev, [conn.teamId]: e.currentTarget.value }))} />
+                  <button class="input-field"
+                    style={{ cursor: 'pointer', padding: '3px 10px', fontSize: '0.7rem', opacity: actionLoading[`${conn.teamId}_coin`] ? 0.5 : 1 }}
+                    disabled={actionLoading[`${conn.teamId}_coin`]}
+                    onClick={() => doAction(conn.teamId, 'coin', selUid, 'SET_COIN', Number(coinValue[conn.teamId] ?? selPlayer?.coin ?? 0))}>
+                    {actionLoading[`${conn.teamId}_coin`] ? '执行中...' : '执行'}
+                  </button>
+                  <ResultBadge k={`${conn.teamId}_coin`} />
+                </div>
+
+                {/* 调整 HP */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px dashed rgba(0,255,157,0.08)', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.7rem', opacity: 0.6, minWidth: '70px' }}>调整 HP</span>
+                  <input class="input-field" type="number" min="0" max="9999"
+                    style={{ width: '70px', padding: '3px 6px', fontSize: '0.75rem' }}
+                    placeholder={String(selPlayer?.hp ?? '')}
+                    value={hpValue[conn.teamId] ?? ''}
+                    onInput={e => setHpValue(prev => ({ ...prev, [conn.teamId]: e.currentTarget.value }))} />
+                  <button class="input-field"
+                    style={{ cursor: 'pointer', padding: '3px 10px', fontSize: '0.7rem', opacity: actionLoading[`${conn.teamId}_hp`] ? 0.5 : 1 }}
+                    disabled={actionLoading[`${conn.teamId}_hp`]}
+                    onClick={() => doAction(conn.teamId, 'hp', selUid, 'SET_HP', Number(hpValue[conn.teamId] ?? selPlayer?.hp ?? 0))}>
+                    {actionLoading[`${conn.teamId}_hp`] ? '执行中...' : '执行'}
+                  </button>
+                  <ResultBadge k={`${conn.teamId}_hp`} />
+                </div>
+
+                {/* 调整回合（整个 team） */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px dashed rgba(0,255,157,0.08)', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.7rem', opacity: 0.6, minWidth: '70px' }}>调整回合</span>
+                  <input class="input-field" type="number" min="1" max="15"
+                    style={{ width: '60px', padding: '3px 6px', fontSize: '0.75rem' }}
+                    placeholder={String(conn.round ?? '')}
+                    value={roundValue[conn.teamId] ?? ''}
+                    onInput={e => setRoundValue(prev => ({ ...prev, [conn.teamId]: e.currentTarget.value }))} />
+                  <span style={{ fontSize: '0.6rem', opacity: 0.4 }}>（对整个队伍生效）</span>
+                  <button class="input-field"
+                    style={{ cursor: 'pointer', padding: '3px 10px', fontSize: '0.7rem', opacity: actionLoading[`${conn.teamId}_round`] ? 0.5 : 1 }}
+                    disabled={actionLoading[`${conn.teamId}_round`]}
+                    onClick={() => doAction(conn.teamId, 'round', conn.userId, 'SET_ROUND', Number(roundValue[conn.teamId] ?? conn.round ?? 1))}>
+                    {actionLoading[`${conn.teamId}_round`] ? '执行中...' : '执行'}
+                  </button>
+                  <ResultBadge k={`${conn.teamId}_round`} />
+                </div>
+
+                {/* 调整盟约叠层 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px dashed rgba(0,255,157,0.08)', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.7rem', opacity: 0.6, minWidth: '70px' }}>盟约叠层</span>
+                  <select class="select-field"
+                    style={{ flex: 1, padding: '3px 6px', fontSize: '0.7rem', minWidth: '120px' }}
+                    value={bondId[conn.teamId] ?? ''}
+                    onChange={e => setBondId(prev => ({ ...prev, [conn.teamId]: e.currentTarget.value }))}>
+                    {chess ? chess.bonds.map(b => (
+                      <option key={b.bondId} value={b.bondId}>{b.name}</option>
+                    )) : <option value="">加载中...</option>}
+                  </select>
+                  <input class="input-field" type="number" min="0" max="99"
+                    style={{ width: '55px', padding: '3px 6px', fontSize: '0.75rem' }}
+                    placeholder="叠层"
+                    value={bondCount[conn.teamId] ?? ''}
+                    onInput={e => setBondCount(prev => ({ ...prev, [conn.teamId]: e.currentTarget.value }))} />
+                  <button class="input-field"
+                    style={{ cursor: 'pointer', padding: '3px 10px', fontSize: '0.7rem', opacity: actionLoading[`${conn.teamId}_bond`] ? 0.5 : 1 }}
+                    disabled={actionLoading[`${conn.teamId}_bond`]}
+                    onClick={() => doAction(conn.teamId, 'bond', selUid, 'SET_BOND_STACK', {
+                      bondId: bondId[conn.teamId] || (chess?.bonds[0]?.bondId ?? ''),
+                      count: Number(bondCount[conn.teamId] ?? 1),
+                    })}>
+                    {actionLoading[`${conn.teamId}_bond`] ? '执行中...' : '执行'}
+                  </button>
+                  <ResultBadge k={`${conn.teamId}_bond`} />
+                </div>
+
+                {/* 添加棋子 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px dashed rgba(0,255,157,0.08)', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.7rem', opacity: 0.6, minWidth: '70px' }}>添加棋子</span>
+                  <select class="select-field"
+                    style={{ flex: 1, padding: '3px 6px', fontSize: '0.7rem', minWidth: '140px' }}
+                    value={chessId[conn.teamId] ?? ''}
+                    onChange={e => setChessId(prev => ({ ...prev, [conn.teamId]: e.currentTarget.value }))}>
+                    {chess ? [
+                      ...chess.chars.map(c => <option key={c.chessId} value={c.chessId}>{c.chessId}</option>),
+                      ...chess.traps.map(c => <option key={c.chessId} value={c.chessId}>[装备] {c.chessId}</option>),
+                    ] : <option value="">加载中...</option>}
+                  </select>
+                  <button class="input-field"
+                    style={{ cursor: 'pointer', padding: '3px 10px', fontSize: '0.7rem', opacity: actionLoading[`${conn.teamId}_chess`] ? 0.5 : 1 }}
+                    disabled={actionLoading[`${conn.teamId}_chess`]}
+                    onClick={() => doAction(conn.teamId, 'chess', selUid, 'ADD_CHESS',
+                      chessId[conn.teamId] || (chess?.chars[0]?.chessId ?? ''))}>
+                    {actionLoading[`${conn.teamId}_chess`] ? '执行中...' : '执行'}
+                  </button>
+                  <ResultBadge k={`${conn.teamId}_chess`} />
+                </div>
+
+                {/* 强制退出到登录页 */}
+                <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    class="input-field"
+                    style={{ cursor: 'pointer', padding: '4px 12px', fontSize: '0.7rem', color: '#ff4d4d', border: '1px solid #ff4d4d', opacity: actionLoading[`${conn.teamId}_forcelogin`] ? 0.5 : 1 }}
+                    disabled={actionLoading[`${conn.teamId}_forcelogin`]}
+                    onClick={() => doAction(conn.teamId, 'forcelogin', conn.userId, 'FORCE_LOGIN')}
+                  >
+                    {actionLoading[`${conn.teamId}_forcelogin`] ? '执行中...' : '⚠ 强制退出到登录页'}
+                  </button>
+                  <ResultBadge k={`${conn.teamId}_forcelogin`} />
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
 export function App() {
   const [jwt, setJwt] = useState<string>(localStorage.getItem('auth_token') || '');
-  const [tempJwt, setTempJwt] = useState<string>('');
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -462,6 +749,8 @@ export function App() {
             currentSeasonId={settings?.seasonId ?? 'act1autochess'}
             onSeasonChange={(id) => setSettings(s => s ? { ...s, seasonId: id } : s)}
           />
+
+          <CheatConsole jwt={jwt} />
         </div>
       </div>
     </>
