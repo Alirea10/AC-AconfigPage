@@ -187,7 +187,6 @@ function CheatConsole({ jwt }: { jwt: string }) {
   const [error, setError] = useState<string | null>(null);
   const [chessListCache, setChessListCache] = useState<Record<string, { chars: ChessItem[]; traps: ChessItem[]; bonds: BondItem[] }>>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [selectedPlayer, setSelectedPlayer] = useState<Record<string, string>>({});
   const [coinValue, setCoinValue] = useState<Record<string, string>>({});
   const [hpValue, setHpValue] = useState<Record<string, string>>({});
   const [roundValue, setRoundValue] = useState<Record<string, string>>({});
@@ -237,11 +236,12 @@ function CheatConsole({ jwt }: { jwt: string }) {
     setTimeout(() => setActionResult(prev => ({ ...prev, [key]: null })), 3000);
   };
 
-  const doAction = async (teamId: string, actionKey: string, userId: string, action: string, value?: any) => {
+  // 只操作自己（服务端从 JWT 里取 userId）
+  const doAction = async (teamId: string, actionKey: string, action: string, value?: any) => {
     const key = `${teamId}_${actionKey}`;
     setActionLoading(prev => ({ ...prev, [key]: true }));
     try {
-      const result = await executeCheatAction(jwt, userId, action as any, value);
+      const result = await executeCheatAction(jwt, action as any, value);
       showResult(key, true, result.message);
     } catch (e: any) {
       showResult(key, false, e.message);
@@ -278,8 +278,6 @@ function CheatConsole({ jwt }: { jwt: string }) {
       {connections.map(conn => {
         const isExpanded = expanded[conn.teamId];
         const chess = chessListCache[conn.teamId];
-        const selUid = selectedPlayer[conn.teamId] || conn.players[0]?.userId || conn.userId;
-        const selPlayer = conn.players.find(p => p.userId === selUid) ?? conn.players[0];
 
         return (
           <div key={conn.teamId} style={{ marginBottom: '16px', border: '1px solid rgba(255,77,77,0.2)', padding: '12px' }}>
@@ -327,36 +325,22 @@ function CheatConsole({ jwt }: { jwt: string }) {
               </table>
             )}
 
-            {/* 展开操作区 */}
+        {/* 展开操作区 */}
             {isExpanded && (
               <div style={{ borderTop: '1px solid rgba(255,77,77,0.2)', paddingTop: '10px', marginTop: '6px' }}>
-                {/* 选择操作目标 */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-                  <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>操作目标</span>
-                  <select
-                    class="select-field"
-                    style={{ flex: 1, padding: '4px 8px', fontSize: '0.75rem' }}
-                    value={selUid}
-                    onChange={e => setSelectedPlayer(prev => ({ ...prev, [conn.teamId]: e.currentTarget.value }))}
-                  >
-                    {conn.players.map(p => (
-                      <option key={p.userId} value={p.userId}>{p.nickName} (#{p.uidIndex})</option>
-                    ))}
-                  </select>
-                </div>
 
                 {/* 调整金币 */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px dashed rgba(0,255,157,0.08)', flexWrap: 'wrap' }}>
                   <span style={{ fontSize: '0.7rem', opacity: 0.6, minWidth: '70px' }}>调整金币</span>
                   <input class="input-field" type="number" min="0" max="999"
                     style={{ width: '70px', padding: '3px 6px', fontSize: '0.75rem' }}
-                    placeholder={String(selPlayer?.coin ?? '')}
+                    placeholder={String(conn.players.find(p => p.userId === conn.userId)?.coin ?? '')}
                     value={coinValue[conn.teamId] ?? ''}
                     onInput={e => setCoinValue(prev => ({ ...prev, [conn.teamId]: e.currentTarget.value }))} />
                   <button class="input-field"
                     style={{ cursor: 'pointer', padding: '3px 10px', fontSize: '0.7rem', opacity: actionLoading[`${conn.teamId}_coin`] ? 0.5 : 1 }}
                     disabled={actionLoading[`${conn.teamId}_coin`]}
-                    onClick={() => doAction(conn.teamId, 'coin', selUid, 'SET_COIN', Number(coinValue[conn.teamId] ?? selPlayer?.coin ?? 0))}>
+                    onClick={() => doAction(conn.teamId, 'coin', 'SET_COIN', Number(coinValue[conn.teamId] || 0))}>
                     {actionLoading[`${conn.teamId}_coin`] ? '执行中...' : '执行'}
                   </button>
                   <ResultBadge k={`${conn.teamId}_coin`} />
@@ -367,13 +351,13 @@ function CheatConsole({ jwt }: { jwt: string }) {
                   <span style={{ fontSize: '0.7rem', opacity: 0.6, minWidth: '70px' }}>调整 HP</span>
                   <input class="input-field" type="number" min="0" max="9999"
                     style={{ width: '70px', padding: '3px 6px', fontSize: '0.75rem' }}
-                    placeholder={String(selPlayer?.hp ?? '')}
+                    placeholder={String(conn.players.find(p => p.userId === conn.userId)?.hp ?? '')}
                     value={hpValue[conn.teamId] ?? ''}
                     onInput={e => setHpValue(prev => ({ ...prev, [conn.teamId]: e.currentTarget.value }))} />
                   <button class="input-field"
                     style={{ cursor: 'pointer', padding: '3px 10px', fontSize: '0.7rem', opacity: actionLoading[`${conn.teamId}_hp`] ? 0.5 : 1 }}
                     disabled={actionLoading[`${conn.teamId}_hp`]}
-                    onClick={() => doAction(conn.teamId, 'hp', selUid, 'SET_HP', Number(hpValue[conn.teamId] ?? selPlayer?.hp ?? 0))}>
+                    onClick={() => doAction(conn.teamId, 'hp', 'SET_HP', Number(hpValue[conn.teamId] || 0))}>
                     {actionLoading[`${conn.teamId}_hp`] ? '执行中...' : '执行'}
                   </button>
                   <ResultBadge k={`${conn.teamId}_hp`} />
@@ -391,7 +375,7 @@ function CheatConsole({ jwt }: { jwt: string }) {
                   <button class="input-field"
                     style={{ cursor: 'pointer', padding: '3px 10px', fontSize: '0.7rem', opacity: actionLoading[`${conn.teamId}_round`] ? 0.5 : 1 }}
                     disabled={actionLoading[`${conn.teamId}_round`]}
-                    onClick={() => doAction(conn.teamId, 'round', conn.userId, 'SET_ROUND', Number(roundValue[conn.teamId] ?? conn.round ?? 1))}>
+                    onClick={() => doAction(conn.teamId, 'round', 'SET_ROUND', Number(roundValue[conn.teamId] || conn.round || 1))}>
                     {actionLoading[`${conn.teamId}_round`] ? '执行中...' : '执行'}
                   </button>
                   <ResultBadge k={`${conn.teamId}_round`} />
@@ -416,7 +400,7 @@ function CheatConsole({ jwt }: { jwt: string }) {
                   <button class="input-field"
                     style={{ cursor: 'pointer', padding: '3px 10px', fontSize: '0.7rem', opacity: actionLoading[`${conn.teamId}_bond`] ? 0.5 : 1 }}
                     disabled={actionLoading[`${conn.teamId}_bond`]}
-                    onClick={() => doAction(conn.teamId, 'bond', selUid, 'SET_BOND_STACK', {
+                    onClick={() => doAction(conn.teamId, 'bond', 'SET_BOND_STACK', {
                       bondId: bondId[conn.teamId] || (chess?.bonds[0]?.bondId ?? ''),
                       count: Number(bondCount[conn.teamId] ?? 1),
                     })}>
@@ -440,24 +424,33 @@ function CheatConsole({ jwt }: { jwt: string }) {
                   <button class="input-field"
                     style={{ cursor: 'pointer', padding: '3px 10px', fontSize: '0.7rem', opacity: actionLoading[`${conn.teamId}_chess`] ? 0.5 : 1 }}
                     disabled={actionLoading[`${conn.teamId}_chess`]}
-                    onClick={() => doAction(conn.teamId, 'chess', selUid, 'ADD_CHESS',
+                    onClick={() => doAction(conn.teamId, 'chess', 'ADD_CHESS',
                       chessId[conn.teamId] || (chess?.chars[0]?.chessId ?? ''))}>
                     {actionLoading[`${conn.teamId}_chess`] ? '执行中...' : '执行'}
                   </button>
                   <ResultBadge k={`${conn.teamId}_chess`} />
                 </div>
 
-                {/* 强制退出到登录页 */}
-                <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {/* 危险操作区 */}
+                <div style={{ marginTop: '10px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                   <button
                     class="input-field"
                     style={{ cursor: 'pointer', padding: '4px 12px', fontSize: '0.7rem', color: '#ff4d4d', border: '1px solid #ff4d4d', opacity: actionLoading[`${conn.teamId}_forcelogin`] ? 0.5 : 1 }}
                     disabled={actionLoading[`${conn.teamId}_forcelogin`]}
-                    onClick={() => doAction(conn.teamId, 'forcelogin', conn.userId, 'FORCE_LOGIN')}
+                    onClick={() => doAction(conn.teamId, 'forcelogin', 'FORCE_LOGIN')}
                   >
                     {actionLoading[`${conn.teamId}_forcelogin`] ? '执行中...' : '⚠ 强制退出到登录页'}
                   </button>
+                  <button
+                    class="input-field"
+                    style={{ cursor: 'pointer', padding: '4px 12px', fontSize: '0.7rem', color: '#ff4d4d', border: '1px solid #ff4d4d', opacity: actionLoading[`${conn.teamId}_dissolve`] ? 0.5 : 1 }}
+                    disabled={actionLoading[`${conn.teamId}_dissolve`]}
+                    onClick={() => doAction(conn.teamId, 'dissolve', 'DISSOLVE_TEAM')}
+                  >
+                    {actionLoading[`${conn.teamId}_dissolve`] ? '执行中...' : '⚠ 强制解散队伍'}
+                  </button>
                   <ResultBadge k={`${conn.teamId}_forcelogin`} />
+                  <ResultBadge k={`${conn.teamId}_dissolve`} />
                 </div>
               </div>
             )}

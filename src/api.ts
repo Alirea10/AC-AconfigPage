@@ -108,7 +108,7 @@ export interface BondItem {
   identifier: number;
 }
 
-export type CheatAction = 'SET_COIN' | 'SET_HP' | 'SET_ROUND' | 'SET_BOND_STACK' | 'ADD_CHESS' | 'FORCE_LOGIN';
+export type CheatAction = 'SET_COIN' | 'SET_HP' | 'SET_ROUND' | 'SET_BOND_STACK' | 'ADD_CHESS' | 'FORCE_LOGIN' | 'DISSOLVE_TEAM';
 
 /** 获取所有在线连接及其战斗状态 */
 export const fetchCheatStatus = async (jwt: string): Promise<CheatConnection[]> => {
@@ -125,17 +125,16 @@ export const fetchChessList = async (jwt: string, teamId: string): Promise<{ cha
   return response.json();
 };
 
-/** 执行作弊操作 */
+/** 执行作弊操作（只操作自己的角色/队伍） */
 export const executeCheatAction = async (
   jwt: string,
-  userId: string,
   action: CheatAction,
   value?: any,
 ): Promise<{ success: boolean; message: string }> => {
   const response = await fetch(`${BASE_URL}/cheat/action?jwt=${jwt}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, action, value }),
+    body: JSON.stringify({ action, value }),
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({ error: response.statusText }));
