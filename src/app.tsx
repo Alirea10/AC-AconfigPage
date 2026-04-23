@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import { type Settings, type SeasonMeta, fetchSettings, updateSetting, fetchSeasons, uploadSeason, deleteSeason, fetchCheatStatus, fetchChessList, executeCheatAction, type CheatConnection, type ChessItem, type BondItem } from './api';
 import { MAPS, NAME_CARDS } from './constants';
 import { SecretarySelector } from './SecretarySelector';
+import { SettlementView } from './SettlementView';
 
 interface JwtPayload {
   appid: string;
@@ -468,6 +469,7 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
   const [userData, setUserData] = useState<JwtPayload | null>(null);
+  const [page, setPage] = useState<'dashboard' | 'settlement'>('dashboard');
 
   useEffect(() => {
     if (jwt) {
@@ -624,129 +626,151 @@ export function App() {
         </div>
       </header>
 
-      <div class="container">
-        {/* 配置区 */}
-        <aside class="cyber-section">
-          <h2 class="section-title">核心参数 <span>CORE_V1.0</span></h2>
-          
-          <div class="setting-item">
-            <div class="setting-info">
-              <h3>回合限时模式</h3>
-              <p>启用后将执行严格操作时限</p>
+      {/* Page Navigation */}
+      <nav class="page-nav">
+        <button
+          class={`page-nav-btn ${page === 'dashboard' ? 'active' : ''}`}
+          onClick={() => setPage('dashboard')}
+        >
+          控制面板 <span>DASHBOARD</span>
+        </button>
+        <button
+          class={`page-nav-btn ${page === 'settlement' ? 'active' : ''}`}
+          onClick={() => setPage('settlement')}
+        >
+          结算统计 <span>SETTLEMENT</span>
+        </button>
+      </nav>
+
+      {page === 'dashboard' ? (
+        <div class="container">
+          {/* 配置区 */}
+          <aside class="cyber-section">
+            <h2 class="section-title">核心参数 <span>CORE_V1.0</span></h2>
+            
+            <div class="setting-item">
+              <div class="setting-info">
+                <h3>回合限时模式</h3>
+                <p>启用后将执行严格操作时限</p>
+              </div>
+              <label class="switch">
+                <input 
+                  type="checkbox" 
+                  checked={settings?.isTurnTimeLimitEnabled} 
+                  onChange={(e) => handleUpdate('isTurnTimeLimitEnabled', e.currentTarget.checked)}
+                  disabled={!!updating}
+                />
+                <span class="slider"></span>
+              </label>
             </div>
-            <label class="switch">
+
+            <div class="setting-item">
+              <div class="setting-info">
+                <h3>时限数值 (秒)</h3>
+              </div>
               <input 
-                type="checkbox" 
-                checked={settings?.isTurnTimeLimitEnabled} 
-                onChange={(e) => handleUpdate('isTurnTimeLimitEnabled', e.currentTarget.checked)}
+                type="number" 
+                class="input-field" 
+                style={{ width: '85px' }}
+                value={settings?.turnTimeLimit}
+                onChange={(e) => handleUpdate('turnTimeLimit', parseInt(e.currentTarget.value))}
                 disabled={!!updating}
               />
-              <span class="slider"></span>
-            </label>
-          </div>
-
-          <div class="setting-item">
-            <div class="setting-info">
-              <h3>时限数值 (秒)</h3>
             </div>
-            <input 
-              type="number" 
-              class="input-field" 
-              style={{ width: '85px' }}
-              value={settings?.turnTimeLimit}
-              onChange={(e) => handleUpdate('turnTimeLimit', parseInt(e.currentTarget.value))}
-              disabled={!!updating}
+
+            <div class="setting-item">
+              <div class="setting-info">
+                <h3>全局共享卡池</h3>
+                <p>所有玩家共用资源池</p>
+              </div>
+              <label class="switch">
+                <input 
+                  type="checkbox" 
+                  checked={settings?.isSharedPoolEnabled} 
+                  onChange={(e) => handleUpdate('isSharedPoolEnabled', e.currentTarget.checked)}
+                  disabled={!!updating}
+                />
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="setting-item">
+              <div class="setting-info">
+                <h3>公开访问权限</h3>
+                <p>是否在大厅公开广播</p>
+              </div>
+              <label class="switch">
+                <input 
+                  type="checkbox" 
+                  checked={settings?.isRoomVisibleInLobby} 
+                  onChange={(e) => handleUpdate('isRoomVisibleInLobby', e.currentTarget.checked)}
+                  disabled={!!updating}
+                />
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="setting-item" style={{ marginTop: '20px', flexDirection: 'column', alignItems: 'stretch', gap: '10px', borderBottom: 'none' }}>
+              <div class="setting-info">
+                <h3>助理干员委派</h3>
+              </div>
+              <SecretarySelector
+                value={settings?.secretary}
+                onChange={(value) => handleUpdate('secretary', value)}
+                disabled={!!updating}
+              />
+            </div>
+          </aside>
+
+          {/* 列表区 */}
+          <div style={{ display: 'grid', gap: '30px' }}>
+            <section class="cyber-section">
+              <h2 class="section-title">授权战区地图 <span>MAP_AUTH</span></h2>
+              <div class="maps-grid">
+                {MAPS.map(map => (
+                  <div 
+                    key={map.id} 
+                    class={`map-card ${settings?.enabledMaps?.includes(map.id) ? 'active' : ''}`}
+                    onClick={() => !updating && toggleMap(map.id)}
+                  >
+                    <img src={map.image} alt={map.name} loading="lazy" />
+                    <div class="map-label">{map.name}</div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section class="cyber-section">
+              <h2 class="section-title">身份标识涂装 <span>ID_SKINS</span></h2>
+              <div class="nc-grid">
+                {Object.entries(NAME_CARDS).map(([id, info]) => (
+                  <div
+                    key={id}
+                    class={`nc-card ${settings?.nameCardSkinId === id ? 'active' : ''}`}
+                    title={info.name}
+                    onClick={() => !updating && handleUpdate('nameCardSkinId', id)}
+                  >
+                    <img src={info.image} alt={info.name} loading="lazy" />
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <SeasonManager
+              jwt={jwt}
+              myUserId={userData?.user_id ?? ''}
+              currentSeasonId={settings?.seasonId ?? 'act1autochess'}
+              onSeasonChange={(id) => setSettings(s => s ? { ...s, seasonId: id } : s)}
             />
+
+            <CheatConsole jwt={jwt} />
           </div>
-
-          <div class="setting-item">
-            <div class="setting-info">
-              <h3>全局共享卡池</h3>
-              <p>所有玩家共用资源池</p>
-            </div>
-            <label class="switch">
-              <input 
-                type="checkbox" 
-                checked={settings?.isSharedPoolEnabled} 
-                onChange={(e) => handleUpdate('isSharedPoolEnabled', e.currentTarget.checked)}
-                disabled={!!updating}
-              />
-              <span class="slider"></span>
-            </label>
-          </div>
-
-          <div class="setting-item">
-            <div class="setting-info">
-              <h3>公开访问权限</h3>
-              <p>是否在大厅公开广播</p>
-            </div>
-            <label class="switch">
-              <input 
-                type="checkbox" 
-                checked={settings?.isRoomVisibleInLobby} 
-                onChange={(e) => handleUpdate('isRoomVisibleInLobby', e.currentTarget.checked)}
-                disabled={!!updating}
-              />
-              <span class="slider"></span>
-            </label>
-          </div>
-
-          <div class="setting-item" style={{ marginTop: '20px', flexDirection: 'column', alignItems: 'stretch', gap: '10px', borderBottom: 'none' }}>
-            <div class="setting-info">
-              <h3>助理干员委派</h3>
-            </div>
-            <SecretarySelector
-              value={settings?.secretary}
-              onChange={(value) => handleUpdate('secretary', value)}
-              disabled={!!updating}
-            />
-          </div>
-        </aside>
-
-        {/* 列表区 */}
-        <div style={{ display: 'grid', gap: '30px' }}>
-          <section class="cyber-section">
-            <h2 class="section-title">授权战区地图 <span>MAP_AUTH</span></h2>
-            <div class="maps-grid">
-              {MAPS.map(map => (
-                <div 
-                  key={map.id} 
-                  class={`map-card ${settings?.enabledMaps?.includes(map.id) ? 'active' : ''}`}
-                  onClick={() => !updating && toggleMap(map.id)}
-                >
-                  <img src={map.image} alt={map.name} loading="lazy" />
-                  <div class="map-label">{map.name}</div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section class="cyber-section">
-            <h2 class="section-title">身份标识涂装 <span>ID_SKINS</span></h2>
-            <div class="nc-grid">
-              {Object.entries(NAME_CARDS).map(([id, info]) => (
-                <div
-                  key={id}
-                  class={`nc-card ${settings?.nameCardSkinId === id ? 'active' : ''}`}
-                  title={info.name}
-                  onClick={() => !updating && handleUpdate('nameCardSkinId', id)}
-                >
-                  <img src={info.image} alt={info.name} loading="lazy" />
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <SeasonManager
-            jwt={jwt}
-            myUserId={userData?.user_id ?? ''}
-            currentSeasonId={settings?.seasonId ?? 'act1autochess'}
-            onSeasonChange={(id) => setSettings(s => s ? { ...s, seasonId: id } : s)}
-          />
-
-          <CheatConsole jwt={jwt} />
         </div>
-      </div>
+      ) : (
+        <div class="container container-wide">
+          <SettlementView jwt={jwt} />
+        </div>
+      )}
     </>
   );
 }

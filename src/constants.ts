@@ -35,7 +35,7 @@ export const NAME_CARDS: Record<string, { name: string; image: string }> = {
   "nc_6d5_1": { name: "圣境", image: "https://media.prts.wiki/thumb/2/2c/个人名片_圣境_入口.png/150px-个人名片_圣境_入口.png" }
 };
 
-export const SECRETARIES: Record<string, string> = {
+export const CHARACTER_NAME_MAP: Record<string, string> = {
     char_285_medic2: 'Lancet-2',
     char_286_cast3: 'Castle-3',
     char_376_therex: 'THRM-EX',

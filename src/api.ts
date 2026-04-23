@@ -125,6 +125,88 @@ export const fetchChessList = async (jwt: string, teamId: string): Promise<{ cha
   return response.json();
 };
 
+// ─── 结算 API ──────────────────────────────────────────────────────────────
+
+export interface SettlementEquip {
+  instId: number;
+  charId: string;
+}
+
+export interface SettlementOnBoardChar {
+  instId: number;
+  charId: string;
+  x: number;
+  y: number;
+  equips: SettlementEquip[];
+}
+
+export interface SettlementCharacter {
+  charId: string;
+  totalDamage: number;
+  buckets: number[];
+}
+
+export interface SettlementBond {
+  bondId: string;
+  layer: number;
+}
+
+export interface SettlementPlayer {
+  uid: string;
+  nickName: string;
+  uidIndex: number;
+  totalDamage: number;
+  damagePercentage: number;
+  characters: SettlementCharacter[];
+  onBoardChars: SettlementOnBoardChar[];
+  bonds: SettlementBond[];
+}
+
+export interface Settlement {
+  teamId: string;
+  seasonId: string;
+  modeId: string;
+  bossId: string;
+  bossHpMax: number;
+  bossStartTime: number;
+  bossEndTime: number;
+  durationMs: number;
+  bucketIntervalMs: number;
+  players: SettlementPlayer[];
+}
+
+export interface SettlementSummary {
+  teamId: string;
+  modeId: string;
+  bossId: string;
+  savedAt: number;
+  playerCount: number;
+  durationMs: number;
+}
+
+export interface SettlementListResponse {
+  settlements: SettlementSummary[];
+}
+
+export const fetchLatestSettlement = async (jwt: string): Promise<Settlement> => {
+  const response = await fetch(`${BASE_URL}/settlement/latest?jwt=${jwt}`);
+  if (!response.ok) throw new Error('Failed to fetch latest settlement');
+  return response.json();
+};
+
+export const fetchSettlementByTeamId = async (jwt: string, teamId: string): Promise<Settlement> => {
+  const response = await fetch(`${BASE_URL}/settlement/${encodeURIComponent(teamId)}?jwt=${jwt}`);
+  if (!response.ok) throw new Error('Failed to fetch settlement');
+  return response.json();
+};
+
+export const fetchSettlements = async (jwt: string): Promise<SettlementSummary[]> => {
+  const response = await fetch(`${BASE_URL}/settlements?jwt=${jwt}`);
+  if (!response.ok) throw new Error('Failed to fetch settlements');
+  const data: SettlementListResponse = await response.json();
+  return data.settlements;
+};
+
 /** 执行作弊操作（只操作自己的角色/队伍） */
 export const executeCheatAction = async (
   jwt: string,

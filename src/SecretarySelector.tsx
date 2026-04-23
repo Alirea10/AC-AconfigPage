@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'preact/hooks';
 import { createPortal } from 'preact/compat';
-import { SECRETARIES } from './constants';
+import { CHARACTER_NAME_MAP } from './constants';
 
 interface Props {
   value?: string;
@@ -14,7 +14,7 @@ export function SecretarySelector({ value, onChange, disabled }: Props) {
   const [dropdownRect, setDropdownRect] = useState<{ top: number, left: number, width: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const secretaryList = useMemo(() => Object.entries(SECRETARIES), []);
+  const secretaryList = useMemo(() => Object.entries(CHARACTER_NAME_MAP), []);
   
   const filteredList = useMemo(() => {
     if (!search) return secretaryList;
@@ -25,7 +25,7 @@ export function SecretarySelector({ value, onChange, disabled }: Props) {
   }, [search, secretaryList]);
 
   const currentName = useMemo(() => 
-    value ? SECRETARIES[value] || 'UNKNOWN' : '请选择干员',
+    value ? CHARACTER_NAME_MAP[value] || 'UNKNOWN' : '请选择干员',
     [value]
   );
 

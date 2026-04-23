@@ -338,3 +338,148 @@ input:checked + .slider::before { transform: translateX(24px); }
 .selector-options::-webkit-scrollbar-thumb {
   background: var(--color-primary-mid);
 }
+
+/* ─── Page Navigation ─────────────────────────────────────────────── */
+
+.page-nav {
+  position: fixed;
+  top: 75px;
+  width: 100%;
+  z-index: 99;
+  display: flex;
+  gap: 2px;
+  padding: 0 40px;
+  background: rgba(1, 8, 5, 0.95);
+  border-bottom: 1px solid var(--color-primary-dim);
+  backdrop-filter: blur(10px);
+}
+
+.page-nav-btn {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-primary);
+  opacity: 0.5;
+  cursor: pointer;
+  padding: 10px 20px;
+  font-family: var(--font-cyber);
+  font-size: 0.8rem;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.page-nav-btn:hover { opacity: 0.8; }
+
+.page-nav-btn.active {
+  opacity: 1;
+  border-bottom-color: var(--color-primary);
+  text-shadow: 0 0 8px var(--color-primary-mid);
+}
+
+.page-nav-btn span {
+  font-size: 0.5rem;
+  opacity: 0.4;
+  letter-spacing: 2px;
+}
+
+@media (max-width: 767px) {
+  .page-nav {
+    top: auto;
+    bottom: 0;
+    padding: 0;
+    flex-direction: row;
+    justify-content: center;
+    border-top: 1px solid var(--color-primary-dim);
+    border-bottom: none;
+  }
+  .page-nav-btn {
+    padding: 8px 16px;
+    font-size: 0.7rem;
+  }
+}
+
+/* ─── Container wide (for settlement full-width) ─────────────────── */
+
+.container-wide {
+  padding-top: 150px !important;
+  grid-template-columns: 1fr !important;
+  max-width: 1200px;
+}
+
+@media (min-width: 768px) {
+  .container-wide {
+    padding-top: 140px !important;
+  }
+}
+
+/* ─── Settlement Charts ───────────────────────────────────────────── */
+
+.settlement-tab {
+  transition: all 0.2s;
+}
+
+.settlement-meta {
+  font-size: 0.7rem;
+}
+
+.settlement-charts-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+@media (min-width: 768px) {
+  .settlement-charts-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.settlement-chart-card {
+  background: rgba(0, 255, 157, 0.02);
+  border: 1px solid rgba(0, 255, 157, 0.1);
+  padding: 12px;
+  overflow: hidden;
+}
+
+.settlement-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed rgba(0, 255, 157, 0.08);
+}
+
+.settlement-chart-sub {
+  font-size: 0.6rem;
+  opacity: 0.5;
+  font-weight: 400;
+}
+
+.settlement-chart-body {
+  min-height: 60px;
+}
+
+.settlement-history-row:hover {
+  background: rgba(0, 255, 157, 0.04);
+}
+
+/* Responsive container adjustments for nav */
+@media (min-width: 768px) {
+  .container {
+    padding-top: 155px;
+  }
+}
+
+@media (max-width: 767px) {
+  .container {
+    padding-bottom: 80px;
+  }
+}
