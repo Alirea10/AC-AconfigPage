@@ -178,7 +178,7 @@ export interface Settlement {
 export interface SettlementSummary {
   teamId: string;
   modeId: string;
-  bossId: string;
+  bossIds: string[];
   savedAt: number;
   playerCount: number;
   durationMs: number;
@@ -188,16 +188,21 @@ export interface SettlementListResponse {
   settlements: SettlementSummary[];
 }
 
+export interface TeamSettlementsResponse {
+  settlements: Settlement[];
+}
+
 export const fetchLatestSettlement = async (jwt: string): Promise<Settlement> => {
   const response = await fetch(`${BASE_URL}/settlement/latest?jwt=${jwt}`);
   if (!response.ok) throw new Error('Failed to fetch latest settlement');
   return response.json();
 };
 
-export const fetchSettlementByTeamId = async (jwt: string, teamId: string): Promise<Settlement> => {
+export const fetchSettlementByTeamId = async (jwt: string, teamId: string): Promise<Settlement[]> => {
   const response = await fetch(`${BASE_URL}/settlement/${encodeURIComponent(teamId)}?jwt=${jwt}`);
   if (!response.ok) throw new Error('Failed to fetch settlement');
-  return response.json();
+  const data: TeamSettlementsResponse = await response.json();
+  return data.settlements;
 };
 
 export const fetchSettlements = async (jwt: string): Promise<SettlementSummary[]> => {

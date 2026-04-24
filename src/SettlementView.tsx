@@ -285,11 +285,29 @@ function BoardLayout({ players }: { players: Settlement['players'] }) {
   );
 }
 
+// ─── Boss Selector ─────────────────────────────────────────────────────────
+
+function BossSelector({ settlements, selectedIdx, onChange }: { settlements: Settlement[]; selectedIdx: number; onChange: (idx: number) => void }) {
+  if (settlements.length === 0) return null;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+      <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>Boss:</span>
+      <select class="input-field" style={{ padding: '4px 12px', fontSize: '0.75rem', borderColor: FG_DIM, background: BG, color: FG, opacity: settlements.length <= 1 ? 0.5 : 1, cursor: settlements.length <= 1 ? 'default' : 'pointer' }}
+        value={selectedIdx} onChange={e => onChange(parseInt(e.currentTarget.value))} disabled={settlements.length <= 1}>
+        {settlements.map((s, i) => (
+          <option key={i} value={i}>{s.bossId} {i === 0 ? '(主)' : ''}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 // ─── Main ──────────────────────────────────────────────────────────────────
 
 export function SettlementView({ jwt }: { jwt: string }) {
   const [tab, setTab] = useState<'latest' | 'history' | 'search'>('latest');
-  const [settlement, setSettlement] = useState<Settlement | null>(null);
+  const [settlements, setSettlements] = useState<Settlement[]>([]);
+  const [selectedBossIdx, setSelectedBossIdx] = useState(0);
   const [summaries, setSummaries] = useState<SettlementSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -297,7 +315,11 @@ export function SettlementView({ jwt }: { jwt: string }) {
 
   const loadLatest = useCallback(async () => {
     setLoading(true); setError(null);
-    try { setSettlement(await fetchLatestSettlement(jwt)); } catch (e: any) { setError(e.message); setSettlement(null); }
+    try {
+      const s = await fetchLatestSettlement(jwt);
+      setSettlements([s]);
+      setSelectedBossIdx(0);
+    } catch (e: any) { setError(e.message); setSettlements([]); }
     finally { setLoading(false); }
   }, [jwt]);
   const loadHistory = useCallback(async () => {
@@ -308,13 +330,19 @@ export function SettlementView({ jwt }: { jwt: string }) {
   const searchById = useCallback(async () => {
     if (!teamIdInput.trim()) return;
     setLoading(true); setError(null);
-    try { setSettlement(await fetchSettlementByTeamId(jwt, teamIdInput.trim())); } catch (e: any) { setError(e.message); setSettlement(null); }
+    try {
+      const s = await fetchSettlementByTeamId(jwt, teamIdInput.trim());
+      setSettlements(s);
+      setSelectedBossIdx(0);
+    } catch (e: any) { setError(e.message); setSettlements([]); }
     finally { setLoading(false); }
   }, [jwt, teamIdInput]);
 
   useEffect(() => { loadLatest(); }, [loadLatest]);
 
-  const onTab = (t: typeof tab) => { setTab(t); setError(null); setSettlement(null); if (t === 'latest') loadLatest(); else if (t === 'history') loadHistory(); };
+  const onTab = (t: typeof tab) => { setTab(t); setError(null); setSettlements([]); if (t === 'latest') loadLatest(); else if (t === 'history') loadHistory(); };
+
+  const settlement = settlements.length > 0 ? settlements[selectedBossIdx] : null;
   const totalDmg = settlement?.players.reduce((s, p) => s + p.totalDamage, 0) || 0;
 
   const bondMap = useMemo(() => {
@@ -347,9 +375,10 @@ export function SettlementView({ jwt }: { jwt: string }) {
           {summaries.length === 0 ? <div style={{ opacity: 0.5, textAlign: 'center', padding: '20px', fontSize: '0.8rem' }}>暂无结算记录</div> : <div style={{ marginBottom: '16px', fontSize: '0.7rem', opacity: 0.5 }}>共 {summaries.length} 条记录（最多保留20条）</div>}
           {summaries.map(s => (
             <div key={s.teamId} class="settlement-history-row" style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '10px 12px', borderBottom: '1px solid rgba(0,255,157,0.06)', cursor: 'pointer' }}
-              onClick={async () => { setLoading(true); setError(null); try { setSettlement(await fetchSettlementByTeamId(jwt, s.teamId)); setTab('search'); setTeamIdInput(s.teamId); } catch (e: any) { setError(e.message); } finally { setLoading(false); } }}>
+              onClick={async () => { setLoading(true); setError(null); try { const data = await fetchSettlementByTeamId(jwt, s.teamId); setSettlements(data); setSelectedBossIdx(0); setTab('search'); setTeamIdInput(s.teamId); } catch (e: any) { setError(e.message); } finally { setLoading(false); } }}>
               <span style={{ fontFamily: 'monospace', fontSize: '0.7rem', opacity: 0.6, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.teamId.slice(0, 24)}...</span>
-              <span style={{ fontSize: '0.7rem', opacity: 0.5 }}>{s.modeId}</span><span style={{ fontSize: '0.7rem', opacity: 0.5 }}>{s.bossId}</span>
+              <span style={{ fontSize: '0.7rem', opacity: 0.5 }}>{s.modeId}</span>
+              <span style={{ fontSize: '0.7rem', opacity: 0.5 }}>{s.bossIds.join(', ')}</span>
               <span style={{ fontSize: '0.7rem', opacity: 0.5 }}>{s.playerCount}人</span><span style={{ fontSize: '0.7rem', opacity: 0.5 }}>{formatMs(s.durationMs)}</span>
               <span style={{ fontSize: '0.65rem', opacity: 0.4 }}>{formatTime(s.savedAt)}</span>
             </div>
@@ -359,6 +388,8 @@ export function SettlementView({ jwt }: { jwt: string }) {
 
       {settlement && (
         <div>
+          <BossSelector settlements={settlements} selectedIdx={selectedBossIdx} onChange={setSelectedBossIdx} />
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px', padding: '12px', marginBottom: '20px', background: 'rgba(0,255,157,0.03)', border: '1px solid rgba(0,255,157,0.1)', fontSize: '0.7rem' }}>
             <div><span style={{ opacity: 0.5 }}>Team:</span> <span style={{ fontFamily: 'monospace' }}>{settlement.teamId.slice(0, 16)}...</span></div>
             <div><span style={{ opacity: 0.5 }}>Mode:</span> {settlement.modeId}</div>
