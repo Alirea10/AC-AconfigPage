@@ -524,6 +524,17 @@ export function App() {
     }
   };
 
+  const handleTurnTimeLimitUpdate = async (
+    key: keyof Settings['turnTimeLimitSettings'],
+    value: boolean | number,
+  ) => {
+    if (!settings) return;
+    await handleUpdate('turnTimeLimitSettings', {
+      ...settings.turnTimeLimitSettings,
+      [key]: value,
+    });
+  };
+
   const toggleMap = (mapId: string) => {
     if (!settings) return;
     const currentMaps = settings.enabledMaps || [];
@@ -648,34 +659,52 @@ export function App() {
           <aside class="cyber-section">
             <h2 class="section-title">核心参数 <span>CORE_V1.0</span></h2>
             
-            <div class="setting-item">
+            <div style={{ display: 'grid', gap: '12px', paddingBottom: '18px', borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: '6px' }}>
               <div class="setting-info">
-                <h3>回合限时模式</h3>
-                <p>启用后将执行严格操作时限</p>
+                <h3>分阶段限时</h3>
+                <p>分别控制准备、特殊准备、Boss 战和普通战斗的时限</p>
               </div>
-              <label class="switch">
-                <input 
-                  type="checkbox" 
-                  checked={settings?.isTurnTimeLimitEnabled} 
-                  onChange={(e) => handleUpdate('isTurnTimeLimitEnabled', e.currentTarget.checked)}
-                  disabled={!!updating}
-                />
-                <span class="slider"></span>
-              </label>
-            </div>
 
-            <div class="setting-item">
-              <div class="setting-info">
-                <h3>时限数值 (秒)</h3>
-              </div>
-              <input 
-                type="number" 
-                class="input-field" 
-                style={{ width: '85px' }}
-                value={settings?.turnTimeLimit}
-                onChange={(e) => handleUpdate('turnTimeLimit', parseInt(e.currentTarget.value))}
-                disabled={!!updating}
-              />
+              {[
+                ['prepareEnabled', 'prepareTimeLimit', '准备阶段'],
+                ['spPrepareEnabled', 'spPrepareTimeLimit', '特殊准备'],
+                ['bossBattleEnabled', 'bossBattleTimeLimit', 'Boss 战斗'],
+                ['normalBattleEnabled', 'normalBattleTimeLimit', '普通战斗'],
+              ].map(([enabledKey, timeKey, label]) => (
+                <div key={enabledKey} class="setting-item" style={{ borderBottom: 'none', paddingBottom: 0 }}>
+                  <div class="setting-info">
+                    <h3>{label}</h3>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <label class="switch">
+                      <input
+                        type="checkbox"
+                        checked={settings?.turnTimeLimitSettings?.[enabledKey as keyof Settings['turnTimeLimitSettings']] as boolean}
+                        onChange={(e) => handleTurnTimeLimitUpdate(
+                          enabledKey as keyof Settings['turnTimeLimitSettings'],
+                          e.currentTarget.checked,
+                        )}
+                        disabled={!!updating}
+                      />
+                      <span class="slider"></span>
+                    </label>
+                    <input
+                      type="number"
+                      min="5"
+                      max="1000"
+                      class="input-field"
+                      style={{ width: '85px' }}
+                      value={settings?.turnTimeLimitSettings?.[timeKey as keyof Settings['turnTimeLimitSettings']] as number}
+                      onChange={(e) => handleTurnTimeLimitUpdate(
+                        timeKey as keyof Settings['turnTimeLimitSettings'],
+                        parseInt(e.currentTarget.value, 10) || 0,
+                      )}
+                      disabled={!!updating}
+                    />
+                    <span style={{ fontSize: '0.7rem', opacity: 0.5 }}>秒</span>
+                  </div>
+                </div>
+              ))}
             </div>
 
             <div class="setting-item">

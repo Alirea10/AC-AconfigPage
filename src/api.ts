@@ -1,6 +1,16 @@
+export interface TurnTimeLimitSettings {
+  prepareEnabled: boolean;
+  prepareTimeLimit: number;
+  spPrepareEnabled: boolean;
+  spPrepareTimeLimit: number;
+  bossBattleEnabled: boolean;
+  bossBattleTimeLimit: number;
+  normalBattleEnabled: boolean;
+  normalBattleTimeLimit: number;
+}
+
 export interface Settings {
-  isTurnTimeLimitEnabled: boolean;
-  turnTimeLimit: number;
+  turnTimeLimitSettings: TurnTimeLimitSettings;
   isSharedPoolEnabled: boolean;
   enabledMaps: string[];
   nameCardSkinId: string;
