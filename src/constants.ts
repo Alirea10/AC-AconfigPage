@@ -6,6 +6,10 @@ export const MAPS = [
   { id: 'act1autochess_m05', name: '战场05', image: 'https://media.prts.wiki/thumb/c/ce/卫戍协议盟约_战场05_地图.png/600px-卫戍协议盟约_战场05_地图.png' },
   { id: 'act1autochess_m06', name: '战场06', image: 'https://media.prts.wiki/thumb/4/4f/卫戍协议盟约_战场06_地图.png/600px-卫戍协议盟约_战场06_地图.png' },
   { id: 'act1autochess_m07', name: '战场07', image: 'https://media.prts.wiki/thumb/b/b4/卫戍协议盟约_战场07_地图.png/600px-卫戍协议盟约_战场07_地图.png' },
+  { id: 'act2autochess_m01', name: '战场08', image: 'https://media.prts.wiki/thumb/2/21/卫戍协议盟约_战场05_ver2_地图.png/800px-卫戍协议盟约_战场05_ver2_地图.png' },
+  { id: 'act2autochess_m02', name: '战场09', image: 'https://media.prts.wiki/thumb/c/c6/卫戍协议盟约_战场06_ver2_地图.png/600px-卫戍协议盟约_战场06_ver2_地图.png' },
+  { id: 'act2autochess_m03', name: '战场10', image: 'https://media.prts.wiki/thumb/c/c8/卫戍协议盟约_战场07_ver2_地图.png/600px-卫戍协议盟约_战场07_ver2_地图.png' },
+  { id: 'act2autochess_m04', name: '战场11', image: 'https://media.prts.wiki/thumb/9/90/卫戍协议盟约_战场08_地图.png/600px-卫戍协议盟约_战场08_地图.png' },
 ];
 
 export const NAME_CARDS: Record<string, { name: string; image: string }> = {
