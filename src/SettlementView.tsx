@@ -126,11 +126,13 @@ function DonutChart({ players }: { players: Settlement['players'] }) {
                   {pie => pie.arcs.map((arc, i) => {
                     const isHover = hoverIdx === i;
                     const [cx2, cy2] = pie.path.centroid(arc);
-                    const midAngle = (arc.startAngle + arc.endAngle) / 2;
-                    const lx = Math.cos(midAngle) * labelRadius;
-                    const ly = Math.sin(midAngle) * labelRadius;
-                    const tx = Math.cos(midAngle) * (labelRadius + 4);
-                    const textAnchor = midAngle > Math.PI ? 'end' : 'start';
+                    const len = Math.hypot(cx2, cy2) || 1;
+                    const ux = cx2 / len;
+                    const uy = cy2 / len;
+                    const lx = ux * labelRadius;
+                    const ly = uy * labelRadius;
+                    const tx = ux * (labelRadius + 4);
+                    const textAnchor = ux < 0 ? 'end' : 'start';
                     return (
                       <g key={arc.data.label} onMouseEnter={() => setHoverIdx(i)} onMouseLeave={() => setHoverIdx(null)} style={{ cursor: 'pointer' }}>
                         <path d={pie.path(arc) || ''} fill={arc.data.color} stroke={isHover ? '#fff' : BG} strokeWidth={isHover ? 3 : 2} />
@@ -138,7 +140,7 @@ function DonutChart({ players }: { players: Settlement['players'] }) {
                           {(arc.data.pct * 100).toFixed(1)}%
                         </text>
                         {/* callout line */}
-                        <line x1={Math.cos(midAngle) * (inner + radius) / 2} y1={Math.sin(midAngle) * (inner + radius) / 2}
+                        <line x1={ux * (inner + radius) / 2} y1={uy * (inner + radius) / 2}
                           x2={lx} y2={ly} stroke={arc.data.color} strokeWidth={1} opacity={0.6} />
                         <text x={tx} y={ly} textAnchor={textAnchor} dominantBaseline="central" fill={FG} fontSize={10} pointerEvents="none">
                           {arc.data.label}
