@@ -14,7 +14,7 @@ export function SecretarySelector({ value, onChange, disabled }: Props) {
   const [dropdownRect, setDropdownRect] = useState<{ top: number, left: number, width: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const secretaryList = useMemo(() => Object.entries(CHARACTER_NAME_MAP), []);
+  const secretaryList = useMemo(() => Object.entries(CHARACTER_NAME_MAP).filter(([id, name]) => id.startsWith('char_')), []);
   
   const filteredList = useMemo(() => {
     if (!search) return secretaryList;
