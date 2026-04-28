@@ -33,7 +33,7 @@ const ttStyles = { ...defaultStyles, background: BG, border: `1px solid ${FG}`, 
 const axisLabel = { fill: FG, fontSize: '0.6rem' as const, fontFamily: "'PingFang SC','Microsoft YaHei',sans-serif" as const };
 const axisLabelLeft = { ...axisLabel, textAnchor: 'end' as const, dy: '0.3em' as const, dx: -4 };
 
-function charName(id: string) { return CHARACTER_NAME_MAP[id] || id.replace('char_', ''); }
+function entityName(id: string) { return CHARACTER_NAME_MAP[id] || id.replace(/^char_/, '').replace(/^trap_/, ''); }
 function formatMs(ms: number) { const s = Math.floor(ms / 1000); const m = Math.floor(s / 60); return m > 0 ? `${m}m ${s % 60}s` : `${s}s`; }
 function formatDamage(d: number) { if (d >= 1e6) return `${(d / 1e6).toFixed(2)}M`; if (d >= 1e3) return `${(d / 1e3).toFixed(1)}K`; return String(d); }
 function formatTime(ts: number) { return new Date(ts).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }); }
@@ -51,7 +51,7 @@ const StackedBarInner = ({
     const rows: Record<string, number | string>[] = [];
     players.forEach(p => {
       const row: Record<string, number | string> = { player: p.nickName };
-      p.characters.forEach(c => { const n = charName(c.charId); allKeys.add(n); row[n] = c.totalDamage; });
+      p.characters.forEach(c => { const n = entityName(c.charId); allKeys.add(n); row[n] = c.totalDamage; });
       rows.push(row);
     });
     return { stackedData: rows, charKeys: Array.from(allKeys), colorScale: scaleOrdinal({ domain: Array.from(allKeys), range: GREEN_SHADES }) };
@@ -170,18 +170,27 @@ function LineChartToggle({ settlement }: { settlement: Settlement }) {
   const margin = { top: 10, right: 20, bottom: 30, left: 50 };
   const [tooltipData, setTooltipData] = useState<{ x: number; y: number; items: { key: string; value: number; color: string }[] } | null>(null);
 
+  useEffect(() => {
+    if (!settlement.players.some(p => p.nickName === selectedPlayer)) {
+      setSelectedPlayer(settlement.players[0]?.nickName ?? '');
+      setHidden(new Set());
+      setTooltipData(null);
+    }
+  }, [selectedPlayer, settlement]);
+
   const { lines, lineData, bucketMs } = useMemo(() => {
     const interval = settlement.bucketIntervalMs;
     const maxB = Math.max(...settlement.players.flatMap(p => p.characters.map(c => c.buckets.length)));
     const pts: { time: number; [k: string]: number }[] = [];
     for (let i = 0; i < maxB; i++) {
       const pt: { time: number; [k: string]: number } = { time: i };
-      settlement.players.forEach(p => p.characters.forEach(c => { pt[`${p.nickName}:${charName(c.charId)}`] = c.buckets[i] || 0; }));
+      settlement.players.forEach(p => p.characters.forEach(c => { pt[`${p.nickName}:${entityName(c.charId)}`] = c.buckets[i] || 0; }));
       pts.push(pt);
     }
     const ls: { key: string; charName: string; playerName: string; color: string }[] = [];
-    settlement.players.forEach((p, pi) => p.characters.forEach(c => {
-      ls.push({ key: `${p.nickName}:${charName(c.charId)}`, charName: charName(c.charId), playerName: p.nickName, color: LINE_COLORS[pi * 8 + ls.filter(l => l.playerName === p.nickName).length % LINE_COLORS.length] });
+    settlement.players.forEach((p, pi) => p.characters.forEach((c, ci) => {
+      const name = entityName(c.charId);
+      ls.push({ key: `${p.nickName}:${name}`, charName: name, playerName: p.nickName, color: LINE_COLORS[(pi * 4 + ci) % LINE_COLORS.length] });
     }));
     return { lines: ls, lineData: pts, bucketMs: interval };
   }, [settlement]);
@@ -257,30 +266,60 @@ function LineChartToggle({ settlement }: { settlement: Settlement }) {
 
 // ─── Board ─────────────────────────────────────────────────────────────────
 
-function BoardLayout({ players }: { players: Settlement['players'] }) {
-  const coords = players.flatMap(p => p.onBoardChars.map(c => ({ x: c.x, y: c.y, nick: p.nickName, cid: c.charId })));
+function BoardLayout({ player, color }: { player: Settlement['players'][number]; color: string }) {
+  const coords = player.onBoardChars.map(c => ({ x: c.x, y: c.y, cid: c.charId, equips: c.equips }));
   if (!coords.length) return <div style={{ opacity: 0.5, textAlign: 'center', padding: '20px' }}>无棋盘数据</div>;
   const minX = Math.min(...coords.map(c => c.x)), maxX = Math.max(...coords.map(c => c.x));
   const minY = Math.min(...coords.map(c => c.y)), maxY = Math.max(...coords.map(c => c.y));
   const cols = maxX - minX + 1, rows = maxY - minY + 1;
   const cs = Math.min(60, Math.max(28, 600 / Math.max(cols, rows)));
-  const map = new Map<string, { nick: string; cid: string }[]>();
-  coords.forEach(c => { const k = `${c.x},${c.y}`; if (!map.has(k)) map.set(k, []); map.get(k)!.push(c); });
-  const pColors = new Map<string, string>();
-  players.forEach((p, i) => pColors.set(p.nickName, playerColor(i)));
+  const map = new Map<string, { cid: string; equips: Settlement['players'][number]['onBoardChars'][number]['equips'] }>();
+  coords.forEach(c => map.set(`${c.x},${c.y}`, { cid: c.cid, equips: c.equips }));
 
   return (
     <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0' }}>
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, ${cs}px)`, gap: '2px' }}>
         {Array.from({ length: rows }, (_, row) => Array.from({ length: cols }, (_, col) => {
           const x = minX + col, y = minY + row;
-          const items = map.get(`${x},${y}`); const empty = !items?.length; const it = items?.[0];
-          const c = it ? pColors.get(it.nick) || FG : undefined;
-          return <div key={`${x},${y}`} title={empty ? `(${x},${y})` : `${charName(it!.cid)} (${it!.nick})`}
-            style={{ width: cs, height: cs, border: `1px solid ${empty ? 'rgba(0,255,157,0.1)' : c}`, background: empty ? 'rgba(0,255,157,0.02)' : `${c}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.max(7, cs * 0.2), color: c || 'rgba(0,255,157,0.3)', overflow: 'hidden', textAlign: 'center', lineHeight: 1.2 }}>
-            {empty ? `${x},${y}` : charName(it!.cid)}</div>;
+          const it = map.get(`${x},${y}`); const empty = !it;
+          const equips = it?.equips.map(eq => entityName(eq.charId)) ?? [];
+          return <div key={`${x},${y}`} title={empty ? `(${x},${y})` : `${entityName(it.cid)} (${player.nickName})${equips.length ? `\n装备: ${equips.join(' / ')}` : ''}`}
+            style={{ width: cs, minHeight: cs, border: `1px solid ${empty ? 'rgba(0,255,157,0.1)' : color}`, background: empty ? 'rgba(0,255,157,0.02)' : `${color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.max(7, cs * 0.2), color: empty ? 'rgba(0,255,157,0.3)' : color, overflow: 'hidden', textAlign: 'center', lineHeight: 1.15, padding: empty ? 0 : '3px' }}>
+            {empty ? `${x},${y}` : (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                <span>{entityName(it.cid)}</span>
+                {equips.length > 0 && <span style={{ fontSize: Math.max(6, cs * 0.14), opacity: 0.8 }}>{equips.join(' / ')}</span>}
+              </div>
+            )}</div>;
         }))}
       </div>
+    </div>
+  );
+}
+
+function BoardLayoutToggle({ players }: { players: Settlement['players'] }) {
+  const [selectedPlayer, setSelectedPlayer] = useState(players[0]?.nickName ?? '');
+
+  useEffect(() => {
+    if (!players.some(p => p.nickName === selectedPlayer)) {
+      setSelectedPlayer(players[0]?.nickName ?? '');
+    }
+  }, [players, selectedPlayer]);
+
+  const playerIndex = players.findIndex(p => p.nickName === selectedPlayer);
+  const player = players[playerIndex >= 0 ? playerIndex : 0];
+
+  if (!player) return <div style={{ opacity: 0.5, textAlign: 'center', padding: '20px' }}>无棋盘数据</div>;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: '4px' }}>
+        <select class="input-field" style={{ padding: '2px 8px', fontSize: '0.7rem', borderColor: FG_DIM, background: BG, color: FG }}
+          value={selectedPlayer} onChange={e => setSelectedPlayer(e.currentTarget.value)}>
+          {players.map(p => <option key={p.uid} value={p.nickName}>{p.nickName}</option>)}
+        </select>
+      </div>
+      <BoardLayout player={player} color={playerColor(Math.max(playerIndex, 0))} />
     </div>
   );
 }
@@ -424,8 +463,8 @@ export function SettlementView({ jwt }: { jwt: string }) {
 
           {settlement.players.some(p => p.onBoardChars.length > 0) && (
             <div class="settlement-chart-card" style={{ marginTop: '16px' }}>
-              <div class="settlement-chart-header"><span>棋盘布局</span><span class="settlement-chart-sub">{settlement.players.reduce((s, p) => s + p.onBoardChars.length, 0)} 个棋子</span></div>
-              <BoardLayout players={settlement.players} />
+              <div class="settlement-chart-header"><span>棋盘布局</span><span class="settlement-chart-sub">按玩家查看站位</span></div>
+              <BoardLayoutToggle players={settlement.players.filter(p => p.onBoardChars.length > 0)} />
             </div>
           )}
 
