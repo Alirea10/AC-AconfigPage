@@ -198,9 +198,10 @@ function LineChartToggle({ settlement }: { settlement: Settlement }) {
   }, [settlement]);
 
   const filteredLines = lines.filter(l => l.playerName === selectedPlayer);
+  const visibleLines = filteredLines.filter(l => !hidden.has(l.key));
 
   if (lineData.length === 0) return null;
-  const maxVal = Math.max(1, ...lineData.flatMap(d => Object.values(d).filter(v => typeof v === 'number') as number[]));
+  const maxVal = Math.max(1, ...lineData.flatMap(d => visibleLines.map(l => (d[l.key] as number) || 0)));
 
   return (
     <div>
@@ -232,7 +233,7 @@ function LineChartToggle({ settlement }: { settlement: Settlement }) {
                   <GridRows scale={yScale} width={xMax} stroke={FG_GRID} strokeDasharray="3 3" />
                   <AxisLeft scale={yScale} tickFormat={v => formatDamage(v as number)} tickLabelProps={() => axisLabelLeft} stroke={FG_DIM} tickStroke={FG_DIM} numTicks={5} />
                   <AxisBottom top={yMax} scale={xScale} tickFormat={v => `${(v as number) * bucketMs / 1000}s`} tickLabelProps={() => axisLabel} stroke={FG_DIM} tickStroke={FG_DIM} numTicks={Math.min(8, lineData.length)} />
-                  {filteredLines.map(l => hidden.has(l.key) ? null : (
+                  {visibleLines.map(l => (
                     <LinePath key={l.key} data={lineData} x={d => xScale(d.time) ?? 0} y={d => yScale(d[l.key] as number) ?? 0} stroke={l.color} strokeWidth={1.5} shapeRendering="crispEdges" />
                   ))}
                   <rect x={0} y={0} width={xMax} height={yMax} fill="transparent"
@@ -242,7 +243,7 @@ function LineChartToggle({ settlement }: { settlement: Settlement }) {
                       const idx = Math.round(xScale.invert(pt.x - margin.left));
                       const clamped = Math.max(0, Math.min(lineData.length - 1, idx));
                       const row = lineData[clamped];
-                      const items = filteredLines.filter(l => !hidden.has(l.key)).map(l => ({ key: l.key, value: (row[l.key] as number) || 0, color: l.color }));
+                       const items = visibleLines.map(l => ({ key: l.key, value: (row[l.key] as number) || 0, color: l.color }));
                       setTooltipData({ x: xScale(clamped) ?? 0, y: pt.y, items });
                     }}
                     onMouseLeave={() => setTooltipData(null)} />
