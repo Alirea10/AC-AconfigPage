@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
-import { type Settings, type SeasonMeta, fetchSettings, updateSetting, fetchSeasons, uploadSeason, deleteSeason, fetchCheatStatus, fetchChessList, executeCheatAction, type CheatConnection, type ChessItem, type BondItem } from './api';
+import { type Settings, type SeasonMeta, fetchSettings, updateSetting, fetchSeasons, uploadSeason, deleteSeason, fetchCheatStatus, fetchChessList, executeCheatAction, type CheatConnection, type ChessItem, type BondItem, fetchTeams, fetchSnapshots, rollbackToSnapshot, type TeamInfo, type SnapshotMeta } from './api';
 import { MAPS, NAME_CARDS } from './constants';
 import { SecretarySelector } from './SecretarySelector';
 import { SettlementView } from './SettlementView';
@@ -462,6 +462,133 @@ function CheatConsole({ jwt }: { jwt: string }) {
   );
 }
 
+// ─── 快照回滚组件 ─────────────────────────────────────────────────────────
+
+function SnapshotRollback({ jwt }: { jwt: string }) {
+  const [teams, setTeams] = useState<TeamInfo[]>([]);
+  const [snapshots, setSnapshots] = useState<Record<string, SnapshotMeta[]>>({});
+  const [expandedTeam, setExpandedTeam] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [rollbackLoading, setRollbackLoading] = useState<string | null>(null);
+  const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  const loadTeams = async () => {
+    try {
+      setLoading(true);
+      setTeams(await fetchTeams(jwt));
+    } catch (e: any) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadTeams(); }, [jwt]);
+
+  const toggleTeam = async (teamId: string) => {
+    if (expandedTeam === teamId) {
+      setExpandedTeam(null);
+      return;
+    }
+    setExpandedTeam(teamId);
+    if (!snapshots[teamId]) {
+      try {
+        const data = await fetchSnapshots(jwt, teamId);
+        setSnapshots(prev => ({ ...prev, [teamId]: data }));
+      } catch (e: any) {
+        console.error(e);
+      }
+    }
+  };
+
+  const doRollback = async (teamId: string, snapshotKey: string) => {
+    if (!confirm('确定要回滚此队伍？所有在线玩家将被踢出重连。')) return;
+    try {
+      setRollbackLoading(snapshotKey);
+      const res = await rollbackToSnapshot(jwt, teamId, snapshotKey);
+      setResult({ ok: true, msg: res.message });
+      setTimeout(() => { setResult(null); loadTeams(); }, 2000);
+    } catch (e: any) {
+      setResult({ ok: false, msg: e.message });
+      setTimeout(() => setResult(null), 4000);
+    } finally {
+      setRollbackLoading(null);
+    }
+  };
+
+  const formatTime = (ts: number) => new Date(ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+  return (
+    <section class="cyber-section">
+      <h2 class="section-title" style={{ color: '#ffaa00', borderBottomColor: '#ffaa00' }}>
+        快照回滚 <span style={{ color: '#ffaa00' }}>SNAPSHOT_SYS</span>
+      </h2>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+        <span style={{ fontSize: '0.7rem', opacity: 0.5 }}>活跃队伍：{teams.length} 个</span>
+        <button class="input-field" style={{ cursor: 'pointer', padding: '3px 10px', fontSize: '0.7rem' }}
+          onClick={loadTeams} disabled={loading}>
+          {loading ? '加载中...' : '刷新'}
+        </button>
+        {result && (
+          <span style={{ fontSize: '0.7rem', color: result.ok ? '#00ff9d' : '#ff4d4d' }}>
+            {result.ok ? '✓' : '✗'} {result.msg}
+          </span>
+        )}
+      </div>
+
+      {teams.length === 0 && !loading && (
+        <div style={{ fontSize: '0.8rem', opacity: 0.4, textAlign: 'center', padding: '20px 0' }}>暂无活跃队伍</div>
+      )}
+
+      {teams.map(team => {
+        const isExpanded = expandedTeam === team.teamId;
+        const teamSnapshots = snapshots[team.teamId] || [];
+        return (
+          <div key={team.teamId} style={{ marginBottom: '12px', border: '1px solid rgba(255,170,0,0.2)', padding: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
+              onClick={() => toggleTeam(team.teamId)}>
+              <span style={{
+                display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%',
+                background: team.state === 'IN_BATTLE' ? '#00ff9d' : '#ffaa00',
+                boxShadow: `0 0 6px ${team.state === 'IN_BATTLE' ? '#00ff9d' : '#ffaa00'}`,
+              }} />
+              <span style={{ fontWeight: 'bold', fontSize: '0.8rem' }}>{team.teamId.slice(0, 12)}...</span>
+              <span style={{ fontSize: '0.65rem', opacity: 0.5 }}>
+                {team.state === 'IN_BATTLE' ? `R${team.round} ${team.sceneState}` : team.state}
+              </span>
+              <span style={{ fontSize: '0.65rem', opacity: 0.4, marginLeft: 'auto' }}>
+                {team.players.map(p => p.nickName).join(', ')}
+              </span>
+              <span style={{ fontSize: '0.7rem', opacity: 0.5 }}>{isExpanded ? '▲' : '▼'}</span>
+            </div>
+
+            {isExpanded && (
+              <div style={{ marginTop: '10px', borderTop: '1px solid rgba(255,170,0,0.15)', paddingTop: '8px' }}>
+                {teamSnapshots.length === 0 ? (
+                  <div style={{ fontSize: '0.75rem', opacity: 0.4, textAlign: 'center', padding: '10px 0' }}>无可用快照（快照在 20 分钟后过期）</div>
+                ) : (
+                  teamSnapshots.map(s => (
+                    <div key={s.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 8px', background: 'rgba(255,255,255,0.03)', marginBottom: '3px', fontSize: '0.75rem' }}>
+                      <span>{formatTime(s.ts)} — 第 {s.round} 回合 ({s.sceneState})</span>
+                      <button class="input-field"
+                        style={{ cursor: 'pointer', padding: '2px 10px', fontSize: '0.68rem', color: '#ffaa00', border: '1px solid #ffaa00' }}
+                        disabled={rollbackLoading === s.key}
+                        onClick={() => doRollback(team.teamId, s.key)}>
+                        {rollbackLoading === s.key ? '回滚中...' : '回滚'}
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
 export function App() {
   const [jwt, setJwt] = useState<string>(localStorage.getItem('auth_token') || '');
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -793,6 +920,7 @@ export function App() {
             />
 
             <CheatConsole jwt={jwt} />
+            <SnapshotRollback jwt={jwt} />
           </div>
         </div>
       ) : (

@@ -222,6 +222,52 @@ export const fetchSettlements = async (jwt: string): Promise<SettlementSummary[]
   return data.settlements;
 };
 
+// ─── 快照回滚 API ──────────────────────────────────────────────────────────
+
+export interface SnapshotMeta {
+  key: string;
+  teamId: string;
+  ts: number;
+  round: number;
+  sceneState: string;
+}
+
+export interface TeamInfo {
+  teamId: string;
+  state: string;
+  round: number | null;
+  sceneState: string | null;
+  playerCount: number;
+  players: { uid: string; nickName: string; hp: number | null }[];
+}
+
+export const fetchTeams = async (jwt: string): Promise<TeamInfo[]> => {
+  const response = await fetch(`${BASE_URL}/cheat/teams?jwt=${jwt}`);
+  if (!response.ok) throw new Error('Failed to fetch teams');
+  const data = await response.json();
+  return data.teams;
+};
+
+export const fetchSnapshots = async (jwt: string, teamId: string): Promise<SnapshotMeta[]> => {
+  const response = await fetch(`${BASE_URL}/cheat/snapshots?jwt=${jwt}&teamId=${encodeURIComponent(teamId)}`);
+  if (!response.ok) throw new Error('Failed to fetch snapshots');
+  const data = await response.json();
+  return data.snapshots;
+};
+
+export const rollbackToSnapshot = async (jwt: string, teamId: string, snapshotKey: string): Promise<{ success: boolean; message: string }> => {
+  const response = await fetch(`${BASE_URL}/cheat/rollback?jwt=${jwt}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ teamId, snapshotKey }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(err.error || 'Rollback failed');
+  }
+  return response.json();
+};
+
 /** 执行作弊操作（只操作自己的角色/队伍） */
 export const executeCheatAction = async (
   jwt: string,
