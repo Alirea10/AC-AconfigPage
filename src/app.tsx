@@ -502,7 +502,6 @@ function SnapshotRollback({ jwt }: { jwt: string }) {
   };
 
   const doRollback = async (teamId: string, snapshotKey: string) => {
-    if (!confirm('确定要回滚此队伍？所有在线玩家将被踢出重连。')) return;
     try {
       setRollbackLoading(snapshotKey);
       const res = await rollbackToSnapshot(jwt, teamId, snapshotKey);
