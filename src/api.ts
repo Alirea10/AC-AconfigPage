@@ -268,6 +268,36 @@ export const rollbackToSnapshot = async (jwt: string, teamId: string, snapshotKe
   return response.json();
 };
 
+export const downloadSnapshot = async (jwt: string, snapshotKey: string): Promise<Blob> => {
+  const response = await fetch(`${BASE_URL}/cheat/snapshot/export?jwt=${jwt}&snapshotKey=${encodeURIComponent(snapshotKey)}`);
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(err.error || 'Snapshot download failed');
+  }
+  return response.blob();
+};
+
+export const importSnapshot = async (jwt: string, teamId: string, file: File): Promise<{ success: boolean; message: string }> => {
+  const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+
+  const response = await fetch(`${BASE_URL}/cheat/snapshot/import?jwt=${jwt}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      teamId,
+      payloadBase64: btoa(binary),
+    }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(err.error || 'Snapshot import failed');
+  }
+  return response.json();
+};
+
 /** 执行作弊操作（只操作自己的角色/队伍） */
 export const executeCheatAction = async (
   jwt: string,

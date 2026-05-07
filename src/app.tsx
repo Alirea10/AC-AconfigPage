@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
-import { type Settings, type SeasonMeta, fetchSettings, updateSetting, fetchSeasons, uploadSeason, deleteSeason, fetchCheatStatus, fetchChessList, executeCheatAction, type CheatConnection, type ChessItem, type BondItem, fetchTeams, fetchSnapshots, rollbackToSnapshot, type TeamInfo, type SnapshotMeta } from './api';
+import { type Settings, type SeasonMeta, fetchSettings, updateSetting, fetchSeasons, uploadSeason, deleteSeason, fetchCheatStatus, fetchChessList, executeCheatAction, type CheatConnection, type ChessItem, type BondItem, fetchTeams, fetchSnapshots, rollbackToSnapshot, downloadSnapshot, importSnapshot, type TeamInfo, type SnapshotMeta } from './api';
 import { MAPS, NAME_CARDS } from './constants';
 import { SecretarySelector } from './SecretarySelector';
 import { SettlementView } from './SettlementView';
@@ -470,12 +470,58 @@ function SnapshotRollback({ jwt }: { jwt: string }) {
   const [expandedTeam, setExpandedTeam] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [rollbackLoading, setRollbackLoading] = useState<string | null>(null);
+  const [transferLoading, setTransferLoading] = useState<string | null>(null);
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [, setNow] = useState(Date.now());
+  const uploadInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  const SCENE_STATE_LABELS: Record<string, string> = {
+    NONE: '未开始',
+    LOADING: '加载中',
+    SP_PREPARE: '特殊准备',
+    PREPARE: '准备阶段',
+    BATTLE: '战斗中',
+    HELP_BATTLE: '协防战斗',
+    BOSS_BATTLE: 'Boss 战',
+    SETTLE: '结算中',
+    END: '已结束',
+    BATTLE_WAITING: '等待开战',
+    BOSS_PREPARE_WAITING: 'Boss 战前等待',
+    PREPARE_RESTART: '准备阶段重开',
+    SP_PREPARE_RESTART: '特殊准备重开',
+    BOSS_BATTLE_RESTART: 'Boss 战重开',
+  };
+
+  const getSceneStateLabel = (sceneState: string | null | undefined) => {
+    if (!sceneState) return '未知状态';
+    return SCENE_STATE_LABELS[sceneState] || sceneState;
+  };
+
+  const formatRelativeTime = (ts: number) => {
+    const diffMs = Date.now() - ts;
+    if (diffMs <= 0) return '0 秒前';
+
+    const second = 1000;
+    const minute = 60 * 1000;
+    const hour = 60 * minute;
+    const day = 24 * hour;
+
+    if (diffMs < minute) return `${Math.floor(diffMs / second)} 秒前`;
+    if (diffMs < hour) return `${Math.floor(diffMs / minute)} 分钟前`;
+    if (diffMs < day) return `${Math.floor(diffMs / hour)} 小时前`;
+    return `${Math.floor(diffMs / day)} 天前`;
+  };
+
+  const formatSnapshotState = (round: number, sceneState: string) => `R${round} · ${getSceneStateLabel(sceneState)}`;
 
   const loadTeams = async () => {
     try {
       setLoading(true);
       setTeams(await fetchTeams(jwt));
+      if (expandedTeam) {
+        const snapshotData = await fetchSnapshots(jwt, expandedTeam);
+        setSnapshots(prev => ({ ...prev, [expandedTeam]: snapshotData }));
+      }
     } catch (e: any) {
       console.error(e);
     } finally {
@@ -485,19 +531,22 @@ function SnapshotRollback({ jwt }: { jwt: string }) {
 
   useEffect(() => { loadTeams(); }, [jwt]);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   const toggleTeam = async (teamId: string) => {
     if (expandedTeam === teamId) {
       setExpandedTeam(null);
       return;
     }
     setExpandedTeam(teamId);
-    if (!snapshots[teamId]) {
-      try {
-        const data = await fetchSnapshots(jwt, teamId);
-        setSnapshots(prev => ({ ...prev, [teamId]: data }));
-      } catch (e: any) {
-        console.error(e);
-      }
+    try {
+      const data = await fetchSnapshots(jwt, teamId);
+      setSnapshots(prev => ({ ...prev, [teamId]: data }));
+    } catch (e: any) {
+      console.error(e);
     }
   };
 
@@ -506,7 +555,13 @@ function SnapshotRollback({ jwt }: { jwt: string }) {
       setRollbackLoading(snapshotKey);
       const res = await rollbackToSnapshot(jwt, teamId, snapshotKey);
       setResult({ ok: true, msg: res.message });
-      setTimeout(() => { setResult(null); loadTeams(); }, 2000);
+      setTimeout(() => {
+        setResult(null);
+        loadTeams();
+        fetchSnapshots(jwt, teamId).then(data => {
+          setSnapshots(prev => ({ ...prev, [teamId]: data }));
+        }).catch(console.error);
+      }, 2000);
     } catch (e: any) {
       setResult({ ok: false, msg: e.message });
       setTimeout(() => setResult(null), 4000);
@@ -515,7 +570,47 @@ function SnapshotRollback({ jwt }: { jwt: string }) {
     }
   };
 
-  const formatTime = (ts: number) => new Date(ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const doDownloadSnapshot = async (snapshot: SnapshotMeta) => {
+    try {
+      setTransferLoading(`download:${snapshot.key}`);
+      const blob = await downloadSnapshot(jwt, snapshot.key);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `snapshot-r${snapshot.round}-${snapshot.sceneState}-${snapshot.ts}.bin`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      setResult({ ok: true, msg: '快照已下载' });
+      setTimeout(() => setResult(null), 2500);
+    } catch (e: any) {
+      setResult({ ok: false, msg: e.message });
+      setTimeout(() => setResult(null), 4000);
+    } finally {
+      setTransferLoading(null);
+    }
+  };
+
+  const doImportSnapshot = async (teamId: string, file: File) => {
+    try {
+      setTransferLoading(`import:${teamId}`);
+      const res = await importSnapshot(jwt, teamId, file);
+      setResult({ ok: true, msg: res.message });
+      setTimeout(() => {
+        setResult(null);
+        loadTeams();
+        fetchSnapshots(jwt, teamId).then(data => {
+          setSnapshots(prev => ({ ...prev, [teamId]: data }));
+        }).catch(console.error);
+      }, 2500);
+    } catch (e: any) {
+      setResult({ ok: false, msg: e.message });
+      setTimeout(() => setResult(null), 4000);
+    } finally {
+      setTransferLoading(null);
+    }
+  };
 
   return (
     <section class="cyber-section">
@@ -542,7 +637,7 @@ function SnapshotRollback({ jwt }: { jwt: string }) {
 
       {teams.map(team => {
         const isExpanded = expandedTeam === team.teamId;
-        const teamSnapshots = snapshots[team.teamId] || [];
+        const teamSnapshots = (snapshots[team.teamId] || []).slice().sort((a, b) => b.ts - a.ts);
         return (
           <div key={team.teamId} style={{ marginBottom: '12px', border: '1px solid rgba(255,170,0,0.2)', padding: '10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
@@ -553,12 +648,33 @@ function SnapshotRollback({ jwt }: { jwt: string }) {
                 boxShadow: `0 0 6px ${team.state === 'IN_BATTLE' ? '#00ff9d' : '#ffaa00'}`,
               }} />
               <span style={{ fontWeight: 'bold', fontSize: '0.8rem' }}>{team.teamId.slice(0, 12)}...</span>
-              <span style={{ fontSize: '0.65rem', opacity: 0.5 }}>
-                {team.state === 'IN_BATTLE' ? `R${team.round} ${team.sceneState}` : team.state}
-              </span>
+                <span style={{ fontSize: '0.65rem', opacity: 0.5 }}>
+                  {team.state === 'IN_BATTLE' ? `R${team.round} ${getSceneStateLabel(team.sceneState)}` : team.state}
+                </span>
               <span style={{ fontSize: '0.65rem', opacity: 0.4, marginLeft: 'auto' }}>
                 {team.players.map(p => p.nickName).join(', ')}
               </span>
+              <button
+                class="input-field"
+                style={{ cursor: 'pointer', padding: '3px 10px', fontSize: '0.68rem', color: '#7ee7ff', border: '1px solid #7ee7ff' }}
+                disabled={transferLoading === `import:${team.teamId}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  uploadInputRefs.current[team.teamId]?.click();
+                }}>
+                {transferLoading === `import:${team.teamId}` ? '导入中...' : '上传快照'}
+              </button>
+              <input
+                ref={(el) => { uploadInputRefs.current[team.teamId] = el; }}
+                type="file"
+                accept=".bin,application/octet-stream"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = (e.currentTarget as HTMLInputElement).files?.[0];
+                  if (file) doImportSnapshot(team.teamId, file);
+                  (e.currentTarget as HTMLInputElement).value = '';
+                }}
+              />
               <span style={{ fontSize: '0.7rem', opacity: 0.5 }}>{isExpanded ? '▲' : '▼'}</span>
             </div>
 
@@ -568,14 +684,65 @@ function SnapshotRollback({ jwt }: { jwt: string }) {
                   <div style={{ fontSize: '0.75rem', opacity: 0.4, textAlign: 'center', padding: '10px 0' }}>无可用快照（快照在 20 分钟后过期）</div>
                 ) : (
                   teamSnapshots.map(s => (
-                    <div key={s.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 8px', background: 'rgba(255,255,255,0.03)', marginBottom: '3px', fontSize: '0.75rem' }}>
-                      <span>{formatTime(s.ts)} — 第 {s.round} 回合 ({s.sceneState})</span>
-                      <button class="input-field"
-                        style={{ cursor: 'pointer', padding: '2px 10px', fontSize: '0.68rem', color: '#ffaa00', border: '1px solid #ffaa00' }}
-                        disabled={rollbackLoading === s.key}
-                        onClick={() => doRollback(team.teamId, s.key)}>
-                        {rollbackLoading === s.key ? '回滚中...' : '回滚'}
-                      </button>
+                    <div
+                      key={s.key}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '10px 12px',
+                        background: 'linear-gradient(90deg, rgba(255,170,0,0.08), rgba(255,255,255,0.02))',
+                        border: '1px solid rgba(255,170,0,0.16)',
+                        marginBottom: '6px',
+                        fontSize: '0.75rem',
+                      }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <span style={{ color: '#ffd36b', fontWeight: 'bold', letterSpacing: '0.04em' }}>
+                            {formatSnapshotState(s.round, s.sceneState)}
+                          </span>
+                          <span style={{
+                            fontSize: '0.65rem',
+                            padding: '1px 8px',
+                            border: '1px solid rgba(255,170,0,0.25)',
+                            background: 'rgba(255,170,0,0.08)',
+                            color: 'rgba(255,240,200,0.88)',
+                          }}>
+                            {formatRelativeTime(s.ts)}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.45, fontFamily: 'monospace' }}>
+                          snapshot: {s.key}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                        <button class="input-field"
+                          style={{
+                            cursor: 'pointer',
+                            padding: '4px 12px',
+                            fontSize: '0.68rem',
+                            color: '#7ee7ff',
+                            border: '1px solid #7ee7ff',
+                          }}
+                          disabled={transferLoading === `download:${s.key}`}
+                          onClick={() => doDownloadSnapshot(s)}>
+                          {transferLoading === `download:${s.key}` ? '下载中...' : '下载'}
+                        </button>
+                        <button class="input-field"
+                          style={{
+                            cursor: 'pointer',
+                            padding: '4px 12px',
+                            fontSize: '0.68rem',
+                            color: '#ffaa00',
+                            border: '1px solid #ffaa00',
+                          }}
+                          disabled={rollbackLoading === s.key}
+                          onClick={() => doRollback(team.teamId, s.key)}>
+                          {rollbackLoading === s.key ? '回滚中...' : '回滚'}
+                        </button>
+                      </div>
                     </div>
                   ))
                 )}
