@@ -16,6 +16,8 @@ export interface Settings {
   nameCardSkinId: string;
   secretary: string;
   isRoomVisibleInLobby: boolean;
+  allowMoreThanFourPlayers: boolean;
+  allowDuplicateStrategySelection: boolean;
   /** 玩家选择的赛季 ID */
   seasonId: string;
 }

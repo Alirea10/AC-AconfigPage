@@ -1032,6 +1032,38 @@ export function App() {
               </label>
             </div>
 
+            <div class="setting-item">
+              <div class="setting-info">
+                <h3>允许 4 人以上组队</h3>
+                <p>放开队伍人数上限</p>
+              </div>
+              <label class="switch">
+                <input
+                  type="checkbox"
+                  checked={settings?.allowMoreThanFourPlayers}
+                  onChange={(e) => handleUpdate('allowMoreThanFourPlayers', e.currentTarget.checked)}
+                  disabled={!!updating}
+                />
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="setting-item">
+              <div class="setting-info">
+                <h3>允许重复盟约</h3>
+                <p>选盟约时不向客户端广播别人的选择</p>
+              </div>
+              <label class="switch">
+                <input
+                  type="checkbox"
+                  checked={settings?.allowDuplicateStrategySelection}
+                  onChange={(e) => handleUpdate('allowDuplicateStrategySelection', e.currentTarget.checked)}
+                  disabled={!!updating}
+                />
+                <span class="slider"></span>
+              </label>
+            </div>
+
             <div class="setting-item" style={{ marginTop: '20px', flexDirection: 'column', alignItems: 'stretch', gap: '10px', borderBottom: 'none' }}>
               <div class="setting-info">
                 <h3>助理干员委派</h3>
