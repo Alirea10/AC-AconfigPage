@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
-import { type Settings, type SeasonMeta, fetchSettings, updateSetting, fetchSeasons, uploadSeason, deleteSeason, fetchCheatStatus, fetchChessList, executeCheatAction, type CheatConnection, type ChessItem, type BondItem, fetchTeams, fetchSnapshots, rollbackToSnapshot, downloadSnapshot, importSnapshot, type TeamInfo, type SnapshotMeta } from './api';
+import { type Settings, type SeasonMeta, fetchSettings, updateSetting, fetchSeasons, uploadSeason, deleteSeason, fetchCheatStatus, fetchChessList, executeCheatAction, kickPlayer, type CheatConnection, type ChessItem, type BondItem, fetchTeams, fetchSnapshots, rollbackToSnapshot, downloadSnapshot, importSnapshot, type TeamInfo, type SnapshotMeta } from './api';
 import { MAPS, NAME_CARDS } from './constants';
 import { SecretarySelector } from './SecretarySelector';
 import { SettlementView } from './SettlementView';
@@ -196,6 +196,7 @@ function CheatConsole({ jwt }: { jwt: string }) {
   const [chessId, setChessId] = useState<Record<string, string>>({});
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
   const [actionResult, setActionResult] = useState<Record<string, { ok: boolean; msg: string } | null>>({});
+  const [kickLoading, setKickLoading] = useState<Record<string, boolean>>({});
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const poll = async () => {
@@ -248,6 +249,19 @@ function CheatConsole({ jwt }: { jwt: string }) {
       showResult(key, false, e.message);
     } finally {
       setActionLoading(prev => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const doKick = async (userId: string) => {
+    const key = `kick_${userId}`;
+    setKickLoading(prev => ({ ...prev, [key]: true }));
+    try {
+      const result = await kickPlayer(jwt, userId);
+      showResult(key, true, result.message);
+    } catch (e: any) {
+      showResult(key, false, e.message);
+    } finally {
+      setKickLoading(prev => ({ ...prev, [key]: false }));
     }
   };
 
@@ -305,7 +319,7 @@ function CheatConsole({ jwt }: { jwt: string }) {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.68rem', marginBottom: '8px' }}>
                 <thead>
                   <tr style={{ opacity: 0.4 }}>
-                    {['#', '昵称', 'HP', '金币', '回合', '棋子', '状态'].map(h => (
+                    {['#', '昵称', 'HP', '金币', '回合', '棋子', '状态', '操作'].map(h => (
                       <th key={h} style={{ textAlign: 'left', padding: '2px 6px', fontWeight: 'normal' }}>{h}</th>
                     ))}
                   </tr>
@@ -320,6 +334,16 @@ function CheatConsole({ jwt }: { jwt: string }) {
                       <td style={{ padding: '3px 6px' }}>{p.round ?? '—'}</td>
                       <td style={{ padding: '3px 6px' }}>{p.charChessCount}</td>
                       <td style={{ padding: '3px 6px', fontSize: '0.6rem', opacity: 0.5 }}>{p.state ?? '—'}</td>
+                      <td style={{ padding: '3px 6px' }}>
+                        <button
+                          style={{ cursor: 'pointer', padding: '1px 6px', fontSize: '0.6rem', color: '#ff4d4d', border: '1px solid #ff4d4d', background: 'transparent', opacity: kickLoading[`kick_${p.userId}`] ? 0.5 : 1 }}
+                          disabled={kickLoading[`kick_${p.userId}`]}
+                          onClick={(e) => { e.stopPropagation(); doKick(p.userId); }}
+                        >
+                          {kickLoading[`kick_${p.userId}`] ? '...' : '踢'}
+                        </button>
+                        <ResultBadge k={`kick_${p.userId}`} />
+                      </td>
                     </tr>
                   ))}
                 </tbody>

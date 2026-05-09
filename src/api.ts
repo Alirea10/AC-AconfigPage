@@ -300,6 +300,20 @@ export const importSnapshot = async (jwt: string, teamId: string, file: File): P
   return response.json();
 };
 
+/** 踢出指定玩家 */
+export const kickPlayer = async (jwt: string, userId: string): Promise<{ success: boolean; message: string }> => {
+  const response = await fetch(`${BASE_URL}/kick?jwt=${jwt}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(err.error || 'Kick failed');
+  }
+  return response.json();
+};
+
 /** 执行作弊操作（只操作自己的角色/队伍） */
 export const executeCheatAction = async (
   jwt: string,
