@@ -210,63 +210,68 @@ function SeasonManager({ jwt, myUserId, currentSeasonId, onSeasonChange }: {
             </tbody>
           </table>
 
-          {customSeasons.length > 0 && (
-            <div style={{ marginTop: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <button
-                class="input-field"
-                style={{ width: '100%', cursor: 'pointer', textAlign: 'left', padding: '8px 12px', fontSize: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                onClick={() => setCustomExpanded(v => !v)}
-                type="button"
-              >
-                <span>非内置版本 ({customSeasons.length})</span>
-                <span style={{ opacity: 0.6 }}>{customExpanded ? '▲' : '▼'}</span>
-              </button>
+          <div style={{ marginTop: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <button
+              class="input-field"
+              style={{ width: '100%', cursor: 'pointer', textAlign: 'left', padding: '8px 12px', fontSize: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              onClick={() => setCustomExpanded(v => !v)}
+              type="button"
+            >
+              <span>非内置版本 ({customSeasons.length})</span>
+              <span style={{ opacity: 0.6 }}>{customExpanded ? '▲' : '▼'}</span>
+            </button>
 
-              {customExpanded && (
-                <div style={{ padding: '10px 12px 12px' }}>
-                  <div style={{ fontSize: '0.72rem', color: '#ffaa00', marginBottom: '10px', lineHeight: 1.6 }}>
-                    这些不是官服版本，可能会有很多 bug 和未完成的地方。
-                  </div>
+            {customExpanded && (
+              <div style={{ padding: '10px 12px 12px' }}>
+                <div style={{ fontSize: '0.72rem', color: '#ffaa00', marginBottom: '10px', lineHeight: 1.6 }}>
+                  这些不是官服版本，可能会有很多 bug 和未完成的地方。
+                </div>
+
+                {customSeasons.length > 0 ? (
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
                     <tbody>
                       {customSeasons.map(renderSeasonRow)}
                     </tbody>
                   </table>
+                ) : (
+                  <div style={{ fontSize: '0.72rem', opacity: 0.45, marginBottom: '12px' }}>
+                    当前还没有非内置版本。
+                  </div>
+                )}
+
+                <div style={{ borderTop: '1px solid var(--color-primary-dim)', paddingTop: '16px', marginTop: '14px' }}>
+                  <h3 style={{ fontSize: '0.8rem', marginBottom: '4px', opacity: 0.8 }}>
+                    {myUploadedSeason ? '替换我的自定义赛季' : '上传自定义赛季'}
+                  </h3>
+                  {myUploadedSeason && (
+                    <div style={{ fontSize: '0.7rem', opacity: 0.5, marginBottom: '10px' }}>
+                      上传新文件会替换现有的「{myUploadedSeason.name}」
+                    </div>
+                  )}
+                  <form onSubmit={handleFileUpload} style={{ display: 'grid', gap: '10px' }}>
+                    <div>
+                      <div style={{ fontSize: '0.7rem', opacity: 0.6, marginBottom: '4px' }}>赛季显示名称</div>
+                      <input class="input-field" type="text" placeholder="e.g. 我的自定义赛季"
+                        value={uploadName} onInput={(e) => setUploadName(e.currentTarget.value)}
+                        required style={{ width: '100%' }} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.7rem', opacity: 0.6, marginBottom: '4px' }}>赛季 JSON 文件</div>
+                      <input class="input-field" type="file" accept=".json" required style={{ width: '100%', cursor: 'pointer' }} />
+                    </div>
+                    {uploadError && <div style={{ color: '#ff4d4d', fontSize: '0.75rem' }}>{uploadError}</div>}
+                    {uploadSuccess && <div style={{ color: '#4dff88', fontSize: '0.75rem' }}>{uploadSuccess}</div>}
+                    <button class="input-field" type="submit" disabled={uploading}
+                      style={{ cursor: 'pointer', background: 'var(--color-primary-dim)', fontWeight: 'bold', border: '2px solid var(--color-primary)' }}>
+                      {uploading ? '上传中...' : (myUploadedSeason ? '替换赛季' : '上传赛季')}
+                    </button>
+                  </form>
                 </div>
-              )}
-            </div>
-          )}
+              </div>
+            )}
+          </div>
         </div>
       )}
-
-      <div style={{ borderTop: '1px solid var(--color-primary-dim)', paddingTop: '16px' }}>
-        <h3 style={{ fontSize: '0.8rem', marginBottom: '4px', opacity: 0.8 }}>
-          {myUploadedSeason ? '替换我的自定义赛季' : '上传自定义赛季'}
-        </h3>
-        {myUploadedSeason && (
-          <div style={{ fontSize: '0.7rem', opacity: 0.5, marginBottom: '10px' }}>
-            上传新文件会替换现有的「{myUploadedSeason.name}」
-          </div>
-        )}
-        <form onSubmit={handleFileUpload} style={{ display: 'grid', gap: '10px' }}>
-          <div>
-            <div style={{ fontSize: '0.7rem', opacity: 0.6, marginBottom: '4px' }}>赛季显示名称</div>
-            <input class="input-field" type="text" placeholder="e.g. 我的自定义赛季"
-              value={uploadName} onInput={(e) => setUploadName(e.currentTarget.value)}
-              required style={{ width: '100%' }} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.7rem', opacity: 0.6, marginBottom: '4px' }}>赛季 JSON 文件</div>
-            <input class="input-field" type="file" accept=".json" required style={{ width: '100%', cursor: 'pointer' }} />
-          </div>
-          {uploadError && <div style={{ color: '#ff4d4d', fontSize: '0.75rem' }}>{uploadError}</div>}
-          {uploadSuccess && <div style={{ color: '#4dff88', fontSize: '0.75rem' }}>{uploadSuccess}</div>}
-          <button class="input-field" type="submit" disabled={uploading}
-            style={{ cursor: 'pointer', background: 'var(--color-primary-dim)', fontWeight: 'bold', border: '2px solid var(--color-primary)' }}>
-            {uploading ? '上传中...' : (myUploadedSeason ? '替换赛季' : '上传赛季')}
-          </button>
-        </form>
-      </div>
     </section>
   );
 }
