@@ -12,6 +12,63 @@ interface JwtPayload {
   exp: number;
 }
 
+function DeferredNumberInput({
+  value,
+  min,
+  max,
+  disabled,
+  className,
+  style,
+  onCommit,
+}: {
+  value: number;
+  min?: number;
+  max?: number;
+  disabled?: boolean;
+  className?: string;
+  style?: preact.JSX.CSSProperties;
+  onCommit: (value: number) => void;
+}) {
+  const [draft, setDraft] = useState(String(value));
+
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+
+  const commit = () => {
+    const parsed = parseInt(draft, 10);
+    if (Number.isNaN(parsed)) {
+      setDraft(String(value));
+      return;
+    }
+
+    const next = Math.min(max ?? parsed, Math.max(min ?? parsed, parsed));
+    if (next !== value) onCommit(next);
+    if (String(next) !== draft) setDraft(String(next));
+  };
+
+  return (
+    <input
+      type="number"
+      min={min}
+      max={max}
+      class={className}
+      style={style}
+      value={draft}
+      onInput={(e) => setDraft(e.currentTarget.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          commit();
+          e.currentTarget.blur();
+        }
+      }}
+      disabled={disabled}
+    />
+  );
+}
+
 // ─── 赛季管理组件 ─────────────────────────────────────────────────────────────
 
 function SeasonManager({ jwt, myUserId, currentSeasonId, onSeasonChange }: {
@@ -29,6 +86,7 @@ function SeasonManager({ jwt, myUserId, currentSeasonId, onSeasonChange }: {
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [settingActive, setSettingActive] = useState<string | null>(null);
+  const [customExpanded, setCustomExpanded] = useState(false);
 
   const mySeasonId = `user:${myUserId}`;
 
@@ -89,6 +147,44 @@ function SeasonManager({ jwt, myUserId, currentSeasonId, onSeasonChange }: {
     ts ? new Date(ts).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
 
   const myUploadedSeason = seasons.find(s => s.id === mySeasonId);
+  const builtinSeasons = seasons.filter(s => s.isBuiltin);
+  const customSeasons = seasons.filter(s => !s.isBuiltin);
+
+  const renderSeasonRow = (s: SeasonMeta) => {
+    const isActive = s.id === currentSeasonId;
+    const isMine = s.id === mySeasonId;
+
+    return (
+      <tr key={s.id} style={{
+        borderBottom: '1px solid rgba(255,255,255,0.05)',
+        background: isActive ? 'rgba(0,255,180,0.06)' : undefined,
+      }}>
+        <td style={{ padding: '6px 8px' }}>
+          {s.name}
+          {isMine && <span style={{ marginLeft: '6px', fontSize: '0.65rem', opacity: 0.5 }}>（我的）</span>}
+          {isActive && <span style={{ marginLeft: '6px', fontSize: '0.65rem', color: 'var(--color-primary)', fontWeight: 'bold' }}>◆ 当前</span>}
+        </td>
+        <td style={{ padding: '6px 8px', fontFamily: 'monospace', opacity: 0.6 }}>{s.crc32 >>> 0}</td>
+        <td style={{ padding: '6px 8px', opacity: 0.6 }}>{s.isBuiltin ? '内置' : formatTs(s.updatedAt)}</td>
+        <td style={{ padding: '6px 8px', display: 'flex', gap: '6px', alignItems: 'center' }}>
+          {!isActive && (
+            <button class="input-field"
+              style={{ cursor: 'pointer', padding: '2px 10px', fontSize: '0.7rem' }}
+              onClick={() => handleSetActive(s.id)} disabled={!!settingActive}>
+              {settingActive === s.id ? '设置中...' : '设为当前'}
+            </button>
+          )}
+          {isMine && (
+            <button class="input-field"
+              style={{ cursor: 'pointer', padding: '2px 10px', fontSize: '0.7rem', color: '#ff6b6b', border: '1px solid #ff6b6b' }}
+              onClick={handleDelete} disabled={deleting}>
+              {deleting ? '删除中...' : '删除'}
+            </button>
+          )}
+        </td>
+      </tr>
+    );
+  };
 
   return (
     <section class="cyber-section">
@@ -110,42 +206,36 @@ function SeasonManager({ jwt, myUserId, currentSeasonId, onSeasonChange }: {
               </tr>
             </thead>
             <tbody>
-              {seasons.map(s => {
-                const isActive = s.id === currentSeasonId;
-                const isMine = s.id === mySeasonId;
-                return (
-                  <tr key={s.id} style={{
-                    borderBottom: '1px solid rgba(255,255,255,0.05)',
-                    background: isActive ? 'rgba(0,255,180,0.06)' : undefined,
-                  }}>
-                    <td style={{ padding: '6px 8px' }}>
-                      {s.name}
-                      {isMine && <span style={{ marginLeft: '6px', fontSize: '0.65rem', opacity: 0.5 }}>（我的）</span>}
-                      {isActive && <span style={{ marginLeft: '6px', fontSize: '0.65rem', color: 'var(--color-primary)', fontWeight: 'bold' }}>◆ 当前</span>}
-                    </td>
-                    <td style={{ padding: '6px 8px', fontFamily: 'monospace', opacity: 0.6 }}>{s.crc32 >>> 0}</td>
-                    <td style={{ padding: '6px 8px', opacity: 0.6 }}>{s.isBuiltin ? '内置' : formatTs(s.updatedAt)}</td>
-                    <td style={{ padding: '6px 8px', display: 'flex', gap: '6px', alignItems: 'center' }}>
-                      {!isActive && (
-                        <button class="input-field"
-                          style={{ cursor: 'pointer', padding: '2px 10px', fontSize: '0.7rem' }}
-                          onClick={() => handleSetActive(s.id)} disabled={!!settingActive}>
-                          {settingActive === s.id ? '设置中...' : '设为当前'}
-                        </button>
-                      )}
-                      {isMine && (
-                        <button class="input-field"
-                          style={{ cursor: 'pointer', padding: '2px 10px', fontSize: '0.7rem', color: '#ff6b6b', border: '1px solid #ff6b6b' }}
-                          onClick={handleDelete} disabled={deleting}>
-                          {deleting ? '删除中...' : '删除'}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+              {builtinSeasons.map(renderSeasonRow)}
             </tbody>
           </table>
+
+          {customSeasons.length > 0 && (
+            <div style={{ marginTop: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <button
+                class="input-field"
+                style={{ width: '100%', cursor: 'pointer', textAlign: 'left', padding: '8px 12px', fontSize: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                onClick={() => setCustomExpanded(v => !v)}
+                type="button"
+              >
+                <span>非内置版本 ({customSeasons.length})</span>
+                <span style={{ opacity: 0.6 }}>{customExpanded ? '▲' : '▼'}</span>
+              </button>
+
+              {customExpanded && (
+                <div style={{ padding: '10px 12px 12px' }}>
+                  <div style={{ fontSize: '0.72rem', color: '#ffaa00', marginBottom: '10px', lineHeight: 1.6 }}>
+                    这些不是官服版本，可能会有很多 bug 和未完成的地方。
+                  </div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem' }}>
+                    <tbody>
+                      {customSeasons.map(renderSeasonRow)}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -830,12 +920,15 @@ export function App() {
 
   const handleUpdate = async (key: keyof Settings, value: any) => {
     if (!settings || !jwt) return;
+    const previous = settings;
     try {
       setUpdating(key);
+      setSettings({ ...settings, [key]: value });
       const updated = await updateSetting(jwt, key, value);
       setSettings(updated);
     } catch (err) {
       console.error(err);
+      setSettings(previous);
     } finally {
       setUpdating(null);
     }
@@ -1005,18 +1098,17 @@ export function App() {
                       />
                       <span class="slider"></span>
                     </label>
-                    <input
-                      type="number"
-                      min="5"
-                      max="1000"
-                      class="input-field"
+                    <DeferredNumberInput
+                      min={5}
+                      max={1000}
+                      className="input-field"
                       style={{ width: '85px' }}
                       value={settings?.turnTimeLimitSettings?.[timeKey as keyof Settings['turnTimeLimitSettings']] as number}
-                      onChange={(e) => handleTurnTimeLimitUpdate(
+                      onCommit={(nextValue) => handleTurnTimeLimitUpdate(
                         timeKey as keyof Settings['turnTimeLimitSettings'],
-                        parseInt(e.currentTarget.value, 10) || 0,
+                        nextValue,
                       )}
-                      disabled={!!updating}
+                      disabled={updating === 'turnTimeLimitSettings'}
                     />
                     <span style={{ fontSize: '0.7rem', opacity: 0.5 }}>秒</span>
                   </div>
