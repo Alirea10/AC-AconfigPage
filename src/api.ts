@@ -100,12 +100,13 @@ export interface CheatPlayer {
 }
 
 export interface CheatConnection {
-  userId: string;
-  nickname: string;
+  userId: string | null;
+  nickname: string | null;
   teamId: string;
   teamState: string;
   inBattle: boolean;
   round: number | null;
+  isAdmin: boolean;
   players: CheatPlayer[];
 }
 
@@ -240,6 +241,7 @@ export interface TeamInfo {
   round: number | null;
   sceneState: string | null;
   playerCount: number;
+  isAdmin: boolean;
   players: { uid: string; nickName: string; hp: number | null }[];
 }
 

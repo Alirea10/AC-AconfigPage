@@ -378,6 +378,7 @@ function CheatConsole({ jwt }: { jwt: string }) {
 
       <div style={{ fontSize: '0.7rem', opacity: 0.5, marginBottom: '12px' }}>
         轮询间隔 2s · 在线连接：{connections.length} 个
+        {connections.some(conn => conn.isAdmin) && <span style={{ color: '#7ee7ff', marginLeft: '8px' }}>管理员视图 · 显示全部队伍</span>}
         {error && <span style={{ color: '#ff4d4d', marginLeft: '8px' }}>错误：{error}</span>}
       </div>
 
@@ -399,10 +400,11 @@ function CheatConsole({ jwt }: { jwt: string }) {
                 background: conn.inBattle ? '#00ff9d' : '#ffaa00',
                 boxShadow: conn.inBattle ? '0 0 6px #00ff9d' : '0 0 6px #ffaa00',
               }} />
-              <span style={{ fontWeight: 'bold', fontSize: '0.85rem' }}>{conn.nickname}</span>
+              <span style={{ fontWeight: 'bold', fontSize: '0.85rem' }}>{conn.nickname ?? conn.players[0]?.nickName ?? 'UNKNOWN'}</span>
               <span style={{ fontSize: '0.65rem', opacity: 0.5 }}>
                 {conn.inBattle ? `对局中 R${conn.round}` : conn.teamState}
               </span>
+              {conn.isAdmin && <span style={{ fontSize: '0.62rem', color: '#7ee7ff', border: '1px solid rgba(126,231,255,0.45)', padding: '1px 6px' }}>ALL</span>}
               <span style={{ fontSize: '0.6rem', opacity: 0.3, marginLeft: 'auto' }}>
                 {conn.teamId.slice(0, 12)}...
               </span>
@@ -739,6 +741,7 @@ function SnapshotRollback({ jwt }: { jwt: string }) {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
         <span style={{ fontSize: '0.7rem', opacity: 0.5 }}>活跃队伍：{teams.length} 个</span>
+        {teams.some(team => team.isAdmin) && <span style={{ fontSize: '0.7rem', color: '#7ee7ff' }}>管理员视图 · 显示全部队伍</span>}
         <button class="input-field" style={{ cursor: 'pointer', padding: '3px 10px', fontSize: '0.7rem' }}
           onClick={loadTeams} disabled={loading}>
           {loading ? '加载中...' : '刷新'}
@@ -1090,8 +1093,13 @@ export function App() {
                   <div class="setting-info">
                     <h3>{label}</h3>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <label class="switch">
+                  <div class="switch-control-group">
+                    <div class="switch-card">
+                      <span class="switch-copy">
+                        <span>{(settings?.turnTimeLimitSettings?.[enabledKey as keyof Settings['turnTimeLimitSettings']] as boolean) ? '已启用' : '已禁用'}</span>
+                        <span>{label}倒计时</span>
+                      </span>
+                      <label class="switch">
                       <input
                         type="checkbox"
                         checked={settings?.turnTimeLimitSettings?.[enabledKey as keyof Settings['turnTimeLimitSettings']] as boolean}
@@ -1102,7 +1110,8 @@ export function App() {
                         disabled={!!updating}
                       />
                       <span class="slider"></span>
-                    </label>
+                      </label>
+                    </div>
                     <DeferredNumberInput
                       min={5}
                       max={1000}
@@ -1126,15 +1135,21 @@ export function App() {
                 <h3>全局共享卡池</h3>
                 <p>所有玩家共用资源池</p>
               </div>
-              <label class="switch">
-                <input 
+              <div class="switch-card compact">
+                <span class="switch-copy">
+                  <span>{settings?.isSharedPoolEnabled ? '共享中' : '已关闭'}</span>
+                  <span>资源池同步</span>
+                </span>
+                <label class="switch">
+                  <input 
                   type="checkbox" 
                   checked={settings?.isSharedPoolEnabled} 
                   onChange={(e) => handleUpdate('isSharedPoolEnabled', e.currentTarget.checked)}
                   disabled={!!updating}
-                />
-                <span class="slider"></span>
-              </label>
+                  />
+                  <span class="slider"></span>
+                </label>
+              </div>
             </div>
 
             <div class="setting-item">
@@ -1142,15 +1157,21 @@ export function App() {
                 <h3>公开访问权限</h3>
                 <p>是否在大厅公开广播</p>
               </div>
-              <label class="switch">
-                <input 
+              <div class="switch-card compact">
+                <span class="switch-copy">
+                  <span>{settings?.isRoomVisibleInLobby ? '公开中' : '隐藏中'}</span>
+                  <span>大厅广播</span>
+                </span>
+                <label class="switch">
+                  <input 
                   type="checkbox" 
                   checked={settings?.isRoomVisibleInLobby} 
                   onChange={(e) => handleUpdate('isRoomVisibleInLobby', e.currentTarget.checked)}
                   disabled={!!updating}
-                />
-                <span class="slider"></span>
-              </label>
+                  />
+                  <span class="slider"></span>
+                </label>
+              </div>
             </div>
 
             <div class="setting-item">
@@ -1158,15 +1179,21 @@ export function App() {
                 <h3>允许 4 人以上组队</h3>
                 <p>放开队伍人数上限</p>
               </div>
-              <label class="switch">
-                <input
+              <div class="switch-card compact">
+                <span class="switch-copy">
+                  <span>{settings?.allowMoreThanFourPlayers ? '已放开' : '标准限制'}</span>
+                  <span>队伍人数上限</span>
+                </span>
+                <label class="switch">
+                  <input
                   type="checkbox"
                   checked={settings?.allowMoreThanFourPlayers}
                   onChange={(e) => handleUpdate('allowMoreThanFourPlayers', e.currentTarget.checked)}
                   disabled={!!updating}
-                />
-                <span class="slider"></span>
-              </label>
+                  />
+                  <span class="slider"></span>
+                </label>
+              </div>
             </div>
 
             <div class="setting-item">
@@ -1174,15 +1201,21 @@ export function App() {
                 <h3>允许重复盟约</h3>
                 <p>选盟约时不向客户端广播别人的选择</p>
               </div>
-              <label class="switch">
-                <input
+              <div class="switch-card compact">
+                <span class="switch-copy">
+                  <span>{settings?.allowDuplicateStrategySelection ? '允许重复' : '禁止重复'}</span>
+                  <span>盟约选择广播</span>
+                </span>
+                <label class="switch">
+                  <input
                   type="checkbox"
                   checked={settings?.allowDuplicateStrategySelection}
                   onChange={(e) => handleUpdate('allowDuplicateStrategySelection', e.currentTarget.checked)}
                   disabled={!!updating}
-                />
-                <span class="slider"></span>
-              </label>
+                  />
+                  <span class="slider"></span>
+                </label>
+              </div>
             </div>
 
             <div class="setting-item" style={{ marginTop: '20px', flexDirection: 'column', alignItems: 'stretch', gap: '10px', borderBottom: 'none' }}>
