@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
-import { ArrowLeft20Regular, ChevronRight20Regular } from '@fluentui/react-icons';
+import { ArrowLeft20Regular, ChevronRight20Regular, Heart20Regular, WeatherSunny20Regular } from '@fluentui/react-icons';
 import { type Settings, type SeasonMeta, fetchSettings, updateSetting, fetchSeasons, uploadSeason, deleteSeason, fetchCheatStatus, fetchChessList, executeCheatAction, kickPlayer, type CheatConnection, type ChessItem, type BondItem, fetchTeams, fetchSnapshots, rollbackToSnapshot, downloadSnapshot, importSnapshot, type TeamInfo, type SnapshotMeta } from './api';
 import { MAPS, NAME_CARDS } from './constants';
 import { SecretarySelector } from './SecretarySelector';
@@ -11,6 +11,332 @@ interface JwtPayload {
   nickname: string;
   iat: number;
   exp: number;
+}
+
+const ORANGE_ASSETS = ['4', '6', '7', '10', '15', '18', '19', '20', '25', '28', '33', '36'];
+
+function shuffleOrangeAssets() {
+  const items = [...ORANGE_ASSETS];
+  for (let i = items.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [items[i], items[j]] = [items[j], items[i]];
+  }
+  return items;
+}
+
+function createFallingStickers(count: number) {
+  const shuffled = shuffleOrangeAssets();
+  return Array.from({ length: count }, (_, i) => {
+    const name = shuffled[i % shuffled.length];
+    const laneWidth = 100 / count;
+    const laneCenter = laneWidth * i + laneWidth / 2;
+    const jitter = (Math.random() - 0.5) * laneWidth * 0.42;
+    const band = i % 4;
+    const baseAngles = [-66, -24, 28, 64];
+    const rotate = Math.max(-75, Math.min(75, baseAngles[band] + Math.round((Math.random() - 0.5) * 18)));
+    const spin = (i % 2 === 0 ? 1 : -1) * Math.round(34 + Math.random() * 28);
+    return {
+      id: `${name}-${i}`,
+      src: `/orange/${name}.webp`,
+      left: Number(Math.max(2, Math.min(94, laneCenter + jitter)).toFixed(2)),
+      size: Math.round(74 + Math.random() * 78),
+      rotate,
+      spin,
+      drift: Math.round(-34 + Math.random() * 68),
+      duration: Math.round(62 + Math.random() * 34),
+      delay: Math.round(-(i / count) * 72 - Math.random() * 10),
+      opacity: Number((0.16 + Math.random() * 0.2).toFixed(2)),
+    };
+  });
+}
+
+type FallingSticker = ReturnType<typeof createFallingStickers>[number];
+
+type PermissionDeviceOrientationEvent = typeof DeviceOrientationEvent & {
+  requestPermission?: () => Promise<PermissionState>;
+};
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function limitVector(x: number, y: number, max: number) {
+  const length = Math.hypot(x, y);
+  if (length <= max || length === 0) return { x, y };
+  const scale = max / length;
+  return { x: x * scale, y: y * scale };
+}
+
+function OrangeStickerLayer({ stickers, active }: { stickers: FallingSticker[]; active: boolean }) {
+  const motionRefs = useRef<(HTMLSpanElement | null)[]>([]);
+  const particlesRef = useRef<Array<{
+    x: number;
+    y: number;
+    homeX: number;
+    homeY: number;
+    vx: number;
+    vy: number;
+    angle: number;
+    angularVelocity: number;
+    mass: number;
+    fallSpeed: number;
+  }>>([]);
+  const pointerRef = useRef({ x: 0, y: 0, active: false });
+  const gyroRef = useRef({ x: 0, y: 0 });
+  const activeRef = useRef(active);
+  const rafRef = useRef<number | null>(null);
+  const lastTimeRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    activeRef.current = active;
+  }, [active]);
+
+  useEffect(() => {
+    const resetParticles = () => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      particlesRef.current = stickers.map((sticker, index) => ({
+        x: width * (sticker.left / 100),
+        y: ((index / stickers.length) * height * 1.35) - height * 0.28,
+        homeX: width * (sticker.left / 100),
+        homeY: ((index / stickers.length) * height * 1.35) - height * 0.28,
+        vx: (Math.random() - 0.5) * 18,
+        vy: 12 + Math.random() * 18,
+        angle: clamp(sticker.rotate, -90, 90),
+        angularVelocity: sticker.spin * 0.006,
+        mass: 0.82 + sticker.size / 190,
+        fallSpeed: 8 + (sticker.duration % 11),
+      }));
+    };
+
+    resetParticles();
+
+    const applyTransform = (index: number) => {
+      const particle = particlesRef.current[index];
+      const node = motionRefs.current[index];
+      if (!particle || !node) return;
+
+      const sticker = stickers[index];
+      const scale = sticker ? 0.96 + (sticker.size % 17) / 180 : 1;
+      node.style.transform = `translate3d(${particle.x.toFixed(2)}px, ${particle.y.toFixed(2)}px, 0) rotate(${particle.angle.toFixed(2)}deg) scale(${scale.toFixed(3)})`;
+    };
+
+    const tick = (time: number) => {
+      const previous = lastTimeRef.current ?? time;
+      const dt = clamp((time - previous) / 1000, 0.001, 0.034);
+      lastTimeRef.current = time;
+
+      if (activeRef.current) {
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        const fieldRadius = Math.min(Math.max(width, height) * 0.22, 260);
+        const pointer = pointerRef.current;
+        const gyro = gyroRef.current;
+        const spring = 1.45;
+        const maxSpeed = 170;
+
+        particlesRef.current.forEach((particle, index) => {
+          const sticker = stickers[index];
+          const size = sticker?.size ?? 100;
+          particle.homeY += particle.fallSpeed * dt;
+          particle.homeX += Math.sin((time * 0.00018) + index * 1.7) * 0.18;
+
+          if (particle.homeY > height + size + 80) {
+            particle.homeY = -size - Math.random() * height * 0.16;
+            particle.homeX = width * (((sticker?.left ?? 50) + (Math.random() - 0.5) * 8) / 100);
+            particle.x = particle.homeX + (Math.random() - 0.5) * 18;
+            particle.y = particle.homeY;
+            particle.vx *= 0.25;
+            particle.vy = 10 + Math.random() * 18;
+          }
+
+          let ax = (particle.homeX - particle.x) * spring + gyro.x * 24;
+          let ay = (particle.homeY - particle.y) * spring + gyro.y * 18;
+
+          if (pointer.active) {
+            const centerX = particle.x + size * 0.5;
+            const centerY = particle.y + size * 0.5;
+            const dx = centerX - pointer.x;
+            const dy = centerY - pointer.y;
+            const distance = Math.hypot(dx, dy) || 1;
+
+            if (distance < fieldRadius) {
+              const falloff = (1 - distance / fieldRadius) ** 2;
+              const force = (1850 * falloff) / particle.mass;
+              const nx = dx / distance;
+              const ny = dy / distance;
+              ax += nx * force;
+              ay += ny * force;
+              particle.angularVelocity += (nx * particle.vy - ny * particle.vx) * 0.00022 * falloff;
+            }
+          }
+
+          particle.vx = (particle.vx + ax * dt) * 0.965;
+          particle.vy = (particle.vy + ay * dt) * 0.972;
+          particle.angularVelocity *= 0.965;
+
+          const limited = limitVector(particle.vx, particle.vy, maxSpeed);
+          particle.vx = limited.x;
+          particle.vy = limited.y;
+
+          particle.x += particle.vx * dt;
+          particle.y += particle.vy * dt;
+          particle.angle += particle.angularVelocity * dt * 60;
+
+          if (particle.angle > 90) {
+            particle.angle = 90;
+            particle.angularVelocity = Math.min(0, particle.angularVelocity) * 0.35;
+          } else if (particle.angle < -90) {
+            particle.angle = -90;
+            particle.angularVelocity = Math.max(0, particle.angularVelocity) * 0.35;
+          }
+        });
+
+        for (let i = 0; i < particlesRef.current.length; i += 1) {
+          const a = particlesRef.current[i];
+          const aSize = stickers[i]?.size ?? 100;
+          if (!a) continue;
+
+          for (let j = i + 1; j < particlesRef.current.length; j += 1) {
+            const b = particlesRef.current[j];
+            const bSize = stickers[j]?.size ?? 100;
+            if (!b) continue;
+
+            const ax = a.x + aSize * 0.5;
+            const ay = a.y + aSize * 0.5;
+            const bx = b.x + bSize * 0.5;
+            const by = b.y + bSize * 0.5;
+            const dx = bx - ax;
+            const dy = by - ay;
+            const distance = Math.hypot(dx, dy) || 1;
+            const minDistance = (aSize + bSize) * 0.34;
+            const overlap = minDistance - distance;
+
+            if (overlap > 0) {
+              const nx = dx / distance;
+              const ny = dy / distance;
+              const totalMass = a.mass + b.mass;
+              const aShare = b.mass / totalMass;
+              const bShare = a.mass / totalMass;
+              const separation = overlap * 0.58;
+
+              a.x -= nx * separation * aShare;
+              a.y -= ny * separation * aShare;
+              b.x += nx * separation * bShare;
+              b.y += ny * separation * bShare;
+
+              const relativeVelocity = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+              if (relativeVelocity < 0) {
+                const impulse = relativeVelocity * -0.42;
+                a.vx -= nx * impulse * aShare;
+                a.vy -= ny * impulse * aShare;
+                b.vx += nx * impulse * bShare;
+                b.vy += ny * impulse * bShare;
+              }
+
+              a.angularVelocity -= ny * 0.03;
+              b.angularVelocity += nx * 0.03;
+            }
+          }
+        }
+
+        particlesRef.current.forEach((particle, index) => {
+          const sticker = stickers[index];
+          const size = sticker?.size ?? 100;
+
+          if (particle.x < -size - 80) {
+            particle.x = -size - 80;
+            particle.vx = Math.abs(particle.vx) * 0.36;
+          } else if (particle.x > width + 80) {
+            particle.x = width + 80;
+            particle.vx = -Math.abs(particle.vx) * 0.36;
+          }
+
+          if (particle.y > height + size + 100) {
+            particle.y = height + size + 100;
+            particle.vy = -Math.abs(particle.vy) * 0.22;
+          }
+
+          const limited = limitVector(particle.vx, particle.vy, maxSpeed);
+          particle.vx = limited.x;
+          particle.vy = limited.y;
+          particle.angle = clamp(particle.angle, -90, 90);
+          applyTransform(index);
+        });
+      }
+
+      rafRef.current = requestAnimationFrame(tick);
+    };
+
+    stickers.forEach((_, index) => applyTransform(index));
+    rafRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      lastTimeRef.current = null;
+    };
+  }, [stickers]);
+
+  useEffect(() => {
+    const handlePointerMove = (event: PointerEvent) => {
+      pointerRef.current = { x: event.clientX, y: event.clientY, active: true };
+    };
+
+    const handlePointerLeave = () => {
+      pointerRef.current.active = false;
+    };
+
+    const handleOrientation = (event: DeviceOrientationEvent) => {
+      if (event.gamma === null && event.beta === null) return;
+      gyroRef.current = {
+        x: clamp((event.gamma ?? 0) / 32, -1, 1),
+        y: clamp(((event.beta ?? 0) - 45) / 42, -1, 1),
+      };
+    };
+
+    const requestOrientationPermission = () => {
+      const OrientationEvent = DeviceOrientationEvent as PermissionDeviceOrientationEvent;
+      void OrientationEvent.requestPermission?.().then((state) => {
+        if (state === 'granted') {
+          window.addEventListener('deviceorientation', handleOrientation);
+        }
+      }).catch(() => undefined);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerleave', handlePointerLeave);
+    window.addEventListener('deviceorientation', handleOrientation);
+    window.addEventListener('touchstart', requestOrientationPermission, { once: true, passive: true });
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerleave', handlePointerLeave);
+      window.removeEventListener('deviceorientation', handleOrientation);
+      window.removeEventListener('touchstart', requestOrientationPermission);
+    };
+  }, []);
+
+  return (
+    <div class="orange-sticker-layer" aria-hidden="true">
+      {stickers.map((sticker, index) => (
+        <span
+          key={sticker.id}
+          ref={(node) => { motionRefs.current[index] = node; }}
+          class="orange-sticker-motion"
+          style={{
+            width: `${sticker.size}px`,
+            '--sticker-opacity': sticker.opacity,
+          } as preact.JSX.CSSProperties}
+        >
+          <img
+            class="orange-sticker"
+            src={sticker.src}
+            alt=""
+          />
+        </span>
+      ))}
+    </div>
+  );
 }
 
 function DeferredNumberInput({
@@ -74,21 +400,26 @@ function SettingsSectionItem({
   title,
   code,
   description,
+  iconSrc,
   onClick,
 }: {
   title: preact.ComponentChildren;
   code?: preact.ComponentChildren;
   description: preact.ComponentChildren;
+  iconSrc?: string;
   onClick: () => void;
 }) {
   return (
     <button type="button" class="settings-section-item dashboard-panel" onClick={onClick}>
-      <span class="settings-section-copy">
-        <span class="settings-section-title-row">
-          <span class="settings-section-title">{title}</span>
-          {code && <span class="settings-section-code">{code}</span>}
+      <span class="settings-section-leading">
+        {iconSrc && <img class="settings-section-avatar" src={iconSrc} alt="" />}
+        <span class="settings-section-copy">
+          <span class="settings-section-title-row">
+            <span class="settings-section-title">{title}</span>
+            {code && <span class="settings-section-code">{code}</span>}
+          </span>
+          <span class="settings-section-description">{description}</span>
         </span>
-        <span class="settings-section-description">{description}</span>
       </span>
       <span class="settings-section-icon"><ChevronRight20Regular /></span>
     </button>
@@ -931,6 +1262,9 @@ function SnapshotRollback({ jwt }: { jwt: string }) {
 
 export function App() {
   const [jwt, setJwt] = useState<string>(localStorage.getItem('auth_token') || '');
+  const [theme, setTheme] = useState<'mono' | 'pink'>((localStorage.getItem('ui_theme') as 'mono' | 'pink') || 'mono');
+  const [panelIcons] = useState(() => shuffleOrangeAssets().slice(0, 6));
+  const [fallingStickers] = useState(() => createFallingStickers(16));
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -945,6 +1279,11 @@ export function App() {
       loadSettings(jwt);
     }
   }, [jwt]);
+
+  useEffect(() => {
+    document.body.dataset.theme = theme;
+    localStorage.setItem('ui_theme', theme);
+  }, [theme]);
 
   const parseJwt = (token: string) => {
     try {
@@ -1040,6 +1379,8 @@ export function App() {
     localStorage.removeItem('auth_token');
   };
 
+  const toggleTheme = () => setTheme(prev => prev === 'mono' ? 'pink' : 'mono');
+
   if (!jwt || error) {
     return (
       <div class="auth-container">
@@ -1082,9 +1423,11 @@ export function App() {
     <>
       <div class="bg-text bg-text-1">RHODES</div>
       <div class="bg-text bg-text-2">ISLAND</div>
+      <OrangeStickerLayer stickers={fallingStickers} active={theme === 'pink'} />
 
       <header class="top-header">
         <h1>
+          <img class="title-mascot" src={`/orange/${panelIcons[5]}.webp`} alt="" />
           明日方舟·橘戍协议
           <span style={{ fontSize: '0.5rem', opacity: '0.5', fontWeight: '400', marginTop: '2px', display: 'block' }}>TERMINAL_INTERFACE // v2.0.4</span>
         </h1>
@@ -1101,6 +1444,10 @@ export function App() {
             <span>Session_Exp</span>
             <span>{formatTime(userData?.exp)}</span>
           </div>
+          <button class="theme-toggle" type="button" onClick={toggleTheme} aria-label="切换主题">
+            {theme === 'pink' ? <Heart20Regular /> : <WeatherSunny20Regular />}
+            <span>{theme === 'pink' ? '粉色主题' : '黑白主题'}</span>
+          </button>
           <div class="info-item" style={{ cursor: 'pointer', opacity: 1, color: '#ff4d4d' }} onClick={logout}>
             <span>Action</span>
             <span>登出</span>
@@ -1132,30 +1479,35 @@ export function App() {
                 title="核心参数"
                 code="CORE_V1.0"
                 description="配置回合限时、共享池、公开权限、人数上限、重复盟约和助理干员。"
+                iconSrc={`/orange/${panelIcons[0]}.webp`}
                 onClick={() => setDashboardPanel('core')}
               />
               <SettingsSectionItem
                 title="授权战区地图"
                 code="MAP_AUTH"
                 description="选择当前房间允许出现的地图池。"
+                iconSrc={`/orange/${panelIcons[1]}.webp`}
                 onClick={() => setDashboardPanel('maps')}
               />
               <SettingsSectionItem
                 title="身份标识涂装"
                 code="ID_SKINS"
                 description="切换房间使用的身份牌和展示外观。"
+                iconSrc={`/orange/${panelIcons[2]}.webp`}
                 onClick={() => setDashboardPanel('skins')}
               />
               <SettingsSectionItem
                 title="赛季管理"
                 code="SEASON_MGR"
                 description="查看内置赛季、启用赛季版本，并上传或替换自定义赛季。"
+                iconSrc={`/orange/${panelIcons[3]}.webp`}
                 onClick={() => setDashboardPanel('season')}
               />
               <SettingsSectionItem
                 title="管理工具"
                 code="ADMIN_TOOLS"
                 description="集中处理作弊控制台、在线队伍操作、快照下载和回滚。"
+                iconSrc={`/orange/${panelIcons[4]}.webp`}
                 onClick={() => setDashboardPanel('tools')}
               />
             </section>
