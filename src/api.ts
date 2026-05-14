@@ -112,6 +112,9 @@ export interface CheatConnection {
 
 export interface ChessItem {
   chessId: string;
+  charId?: string | null;
+  name?: string | null;
+  itemType?: 'EQUIP' | 'MAGIC';
   identifier: number;
 }
 
@@ -321,11 +324,12 @@ export const executeCheatAction = async (
   jwt: string,
   action: CheatAction,
   value?: any,
+  teamId?: string,
 ): Promise<{ success: boolean; message: string }> => {
   const response = await fetch(`${BASE_URL}/cheat/action?jwt=${jwt}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action, value }),
+    body: JSON.stringify({ action, value, teamId }),
   });
   if (!response.ok) {
     const err = await response.json().catch(() => ({ error: response.statusText }));

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { ArrowLeft20Regular, ChevronRight20Regular, Heart20Regular, WeatherSunny20Regular } from '@fluentui/react-icons';
 import { type Settings, type SeasonMeta, fetchSettings, updateSetting, fetchSeasons, uploadSeason, deleteSeason, fetchCheatStatus, fetchChessList, executeCheatAction, kickPlayer, type CheatConnection, type ChessItem, type BondItem, fetchTeams, fetchSnapshots, rollbackToSnapshot, downloadSnapshot, importSnapshot, type TeamInfo, type SnapshotMeta } from './api';
-import { MAPS, NAME_CARDS } from './constants';
+import { CHARACTER_NAME_MAP, MAPS, NAME_CARDS } from './constants';
 import { SecretarySelector } from './SecretarySelector';
 import { SettlementView } from './SettlementView';
 
@@ -663,7 +663,389 @@ function SeasonManager({ jwt, myUserId, currentSeasonId, onSeasonChange }: {
 
 // ─── 作弊控制台组件 ─────────────────────────────────────────────────────────
 
+const SCENE_STATE_LABELS: Record<string, string> = {
+  NONE: '未开始',
+  LOADING: '加载中',
+  SP_PREPARE: '特殊准备',
+  PREPARE: '准备阶段',
+  BATTLE: '战斗中',
+  HELP_BATTLE: '协防战斗',
+  BOSS_BATTLE: 'Boss 战',
+  SETTLE: '结算中',
+  END: '已结束',
+  BATTLE_WAITING: '等待开战',
+  BOSS_PREPARE_WAITING: 'Boss 战前等待',
+  PREPARE_RESTART: '准备重开',
+  SP_PREPARE_RESTART: '特殊准备重开',
+  BOSS_BATTLE_RESTART: 'Boss 战重开',
+};
+
+function sceneLabel(value: string | null | undefined) {
+  return value ? (SCENE_STATE_LABELS[value] || value) : '未知状态';
+}
+
+function relativeTime(ts: number) {
+  const diffMs = Date.now() - ts;
+  if (diffMs <= 0) return '刚刚';
+  if (diffMs < 60 * 1000) return `${Math.floor(diffMs / 1000)} 秒前`;
+  if (diffMs < 60 * 60 * 1000) return `${Math.floor(diffMs / 60000)} 分钟前`;
+  if (diffMs < 24 * 60 * 60 * 1000) return `${Math.floor(diffMs / 3600000)} 小时前`;
+  return `${Math.floor(diffMs / 86400000)} 天前`;
+}
+
+function chessDisplayName(item: ChessItem) {
+  const fallbackName = item.charId ? CHARACTER_NAME_MAP[item.charId] : undefined;
+  const name = item.name || fallbackName || item.chessId;
+  return name === item.chessId ? name : `${name} (${item.chessId})`;
+}
+
 function CheatConsole({ jwt }: { jwt: string }) {
+  const [connections, setConnections] = useState<CheatConnection[]>([]);
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [chessListCache, setChessListCache] = useState<Record<string, { chars: ChessItem[]; traps: ChessItem[]; bonds: BondItem[] }>>({});
+  const [coinValue, setCoinValue] = useState('');
+  const [hpValue, setHpValue] = useState('');
+  const [roundValue, setRoundValue] = useState('');
+  const [bondId, setBondId] = useState('');
+  const [bondCount, setBondCount] = useState('1');
+  const [chessId, setChessId] = useState('');
+  const [chessSearch, setChessSearch] = useState('');
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [actionResult, setActionResult] = useState<{ key: string; ok: boolean; msg: string } | null>(null);
+  const [kickLoading, setKickLoading] = useState<string | null>(null);
+  const [snapshots, setSnapshots] = useState<Record<string, SnapshotMeta[]>>({});
+  const [rollbackLoading, setRollbackLoading] = useState<string | null>(null);
+  const [transferLoading, setTransferLoading] = useState<string | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const uploadInputRef = useRef<HTMLInputElement | null>(null);
+
+  const selectedConn = connections.find(conn => conn.teamId === selectedTeamId) ?? connections[0] ?? null;
+  const selectedTeam = selectedConn?.teamId ?? '';
+  const chess = selectedTeam ? chessListCache[selectedTeam] : undefined;
+  const isAdminView = connections.some(conn => conn.isAdmin);
+  const me = selectedConn?.players.find(p => p.userId === selectedConn.userId) ?? selectedConn?.players[0] ?? null;
+  const allChess = chess ? [...chess.chars, ...chess.traps] : [];
+  const visibleChess = allChess.filter(item => {
+    const text = `${item.chessId} ${item.charId ?? ''} ${item.name ?? ''} ${item.charId ? CHARACTER_NAME_MAP[item.charId] ?? '' : ''}`.toLowerCase();
+    return text.includes(chessSearch.trim().toLowerCase());
+  }).slice(0, 160);
+
+  const showResult = (key: string, ok: boolean, msg: string) => {
+    setActionResult({ key, ok, msg });
+    window.setTimeout(() => setActionResult(current => current?.key === key ? null : current), 3200);
+  };
+
+  const poll = async () => {
+    try {
+      const data = await fetchCheatStatus(jwt);
+      setConnections(data);
+      setSelectedTeamId(prev => prev && data.some(conn => conn.teamId === prev) ? prev : (data[0]?.teamId ?? null));
+      setError(null);
+    } catch (e: any) {
+      setError(e.message);
+    }
+  };
+
+  const loadChessList = async (teamId: string) => {
+    if (chessListCache[teamId]) return;
+    try {
+      const data = await fetchChessList(jwt, teamId);
+      setChessListCache(prev => ({ ...prev, [teamId]: data }));
+      setBondId(current => current || data.bonds[0]?.bondId || '');
+      setChessId(current => current || data.chars[0]?.chessId || data.traps[0]?.chessId || '');
+    } catch (e: any) {
+      showResult('chess-list', false, e.message);
+    }
+  };
+
+  const loadSnapshots = async (teamId: string) => {
+    try {
+      const data = await fetchSnapshots(jwt, teamId);
+      setSnapshots(prev => ({ ...prev, [teamId]: data }));
+    } catch (e: any) {
+      showResult('snapshot', false, e.message);
+    }
+  };
+
+  useEffect(() => {
+    poll();
+    timerRef.current = setInterval(poll, 2000);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [jwt]);
+
+  useEffect(() => {
+    if (!selectedTeam) return;
+    loadChessList(selectedTeam);
+    loadSnapshots(selectedTeam);
+  }, [selectedTeam]);
+
+  const doAction = async (key: string, action: string, value?: any) => {
+    if (!selectedTeam) return;
+    setActionLoading(key);
+    try {
+      const result = await executeCheatAction(jwt, action as any, value, selectedTeam);
+      showResult(key, true, result.message);
+      await poll();
+    } catch (e: any) {
+      showResult(key, false, e.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const doKick = async (userId: string) => {
+    setKickLoading(userId);
+    try {
+      const result = await kickPlayer(jwt, userId);
+      showResult(`kick:${userId}`, true, result.message);
+      await poll();
+    } catch (e: any) {
+      showResult(`kick:${userId}`, false, e.message);
+    } finally {
+      setKickLoading(null);
+    }
+  };
+
+  const doRollback = async (snapshotKey: string) => {
+    if (!selectedTeam) return;
+    setRollbackLoading(snapshotKey);
+    try {
+      const res = await rollbackToSnapshot(jwt, selectedTeam, snapshotKey);
+      showResult('snapshot', true, res.message);
+      await loadSnapshots(selectedTeam);
+    } catch (e: any) {
+      showResult('snapshot', false, e.message);
+    } finally {
+      setRollbackLoading(null);
+    }
+  };
+
+  const doDownloadSnapshot = async (snapshot: SnapshotMeta) => {
+    try {
+      setTransferLoading(`download:${snapshot.key}`);
+      const blob = await downloadSnapshot(jwt, snapshot.key);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `snapshot-r${snapshot.round}-${snapshot.sceneState}-${snapshot.ts}.bin`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      showResult('snapshot', true, '快照已下载');
+    } catch (e: any) {
+      showResult('snapshot', false, e.message);
+    } finally {
+      setTransferLoading(null);
+    }
+  };
+
+  const doImportSnapshot = async (file: File) => {
+    if (!selectedTeam) return;
+    try {
+      setTransferLoading(`import:${selectedTeam}`);
+      const res = await importSnapshot(jwt, selectedTeam, file);
+      showResult('snapshot', true, res.message);
+      await loadSnapshots(selectedTeam);
+    } catch (e: any) {
+      showResult('snapshot', false, e.message);
+    } finally {
+      setTransferLoading(null);
+    }
+  };
+
+  if (!selectedConn) {
+    return (
+      <div class="admin-tools admin-tools-v2">
+        <div class="admin-empty">{error ? `连接失败：${error}` : '暂无在线队伍'}</div>
+      </div>
+    );
+  }
+
+  const Result = ({ k }: { k: string }) => (
+    actionResult?.key === k ? (
+      <span class={`admin-result ${actionResult.ok ? 'ok' : 'bad'}`}>
+        {actionResult.ok ? '已完成' : '失败'}：{actionResult.msg}
+      </span>
+    ) : null
+  );
+
+  return (
+    <div class="admin-tools admin-tools-v2">
+      <div class="admin-hero">
+        <div>
+          <div class="admin-kicker">{isAdminView ? '管理员视图' : '我的队伍'} · 每 2 秒自动刷新</div>
+          <h3>{selectedConn.nickname ?? me?.nickName ?? '当前连接'}</h3>
+          <div class="admin-hero-meta">
+            <span class={selectedConn.inBattle ? 'live' : ''}>{selectedConn.inBattle ? `对局中 · R${selectedConn.round ?? '-'}` : selectedConn.teamState}</span>
+            <span>{selectedConn.players.length} 人在线</span>
+            {error && <span class="danger">同步失败：{error}</span>}
+          </div>
+        </div>
+        {isAdminView && connections.length > 1 && (
+          <div class="admin-team-tabs" role="tablist" aria-label="选择队伍">
+            {connections.map(conn => (
+              <button
+                key={conn.teamId}
+                type="button"
+                class={conn.teamId === selectedTeam ? 'active' : ''}
+                onClick={() => setSelectedTeamId(conn.teamId)}
+              >
+                {conn.nickname ?? conn.players[0]?.nickName ?? '队伍'}
+                <span>{conn.inBattle ? `R${conn.round ?? '-'}` : `${conn.players.length}人`}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div class="admin-player-strip">
+        {selectedConn.players.map(player => (
+          <div class="admin-player-chip" key={player.uid}>
+            <strong>{player.nickName}</strong>
+            <span>生命 {player.hp ?? '-'}</span>
+            <span>金币 {player.coin ?? '-'}</span>
+            <span>棋子 {player.charChessCount}</span>
+            <button
+              type="button"
+              disabled={kickLoading === player.userId}
+              onClick={() => doKick(player.userId)}
+            >
+              {kickLoading === player.userId ? '移出中' : '移出'}
+            </button>
+            <Result k={`kick:${player.userId}`} />
+          </div>
+        ))}
+      </div>
+
+      <div class="admin-grid">
+        <section class="admin-command-panel">
+          <div class="admin-panel-title">
+            <h4>常用调整</h4>
+            <span>作用于 {me?.nickName ?? '当前玩家'}</span>
+          </div>
+          <div class="admin-command-list">
+            <label>
+              <span>金币</span>
+              <input class="input-field" type="number" min="0" max="999" placeholder={String(me?.coin ?? '')} value={coinValue} onInput={e => setCoinValue(e.currentTarget.value)} />
+              <button type="button" disabled={actionLoading === 'coin'} onClick={() => doAction('coin', 'SET_COIN', Number(coinValue || 0))}>{actionLoading === 'coin' ? '执行中' : '设置'}</button>
+              <Result k="coin" />
+            </label>
+            <label>
+              <span>生命</span>
+              <input class="input-field" type="number" min="0" max="9999" placeholder={String(me?.hp ?? '')} value={hpValue} onInput={e => setHpValue(e.currentTarget.value)} />
+              <button type="button" disabled={actionLoading === 'hp'} onClick={() => doAction('hp', 'SET_HP', Number(hpValue || 0))}>{actionLoading === 'hp' ? '执行中' : '设置'}</button>
+              <Result k="hp" />
+            </label>
+            <label>
+              <span>回合</span>
+              <input class="input-field" type="number" min="1" max="15" placeholder={String(selectedConn.round ?? '')} value={roundValue} onInput={e => setRoundValue(e.currentTarget.value)} />
+              <button type="button" disabled={actionLoading === 'round'} onClick={() => doAction('round', 'SET_ROUND', Number(roundValue || selectedConn.round || 1))}>{actionLoading === 'round' ? '执行中' : '设置'}</button>
+              <Result k="round" />
+            </label>
+            <label>
+              <span>盟约层数</span>
+              <select class="select-field" value={bondId} onChange={e => setBondId(e.currentTarget.value)}>
+                {chess ? chess.bonds.map(b => <option key={b.bondId} value={b.bondId}>{b.name}</option>) : <option value="">加载中</option>}
+              </select>
+              <input class="input-field compact" type="number" min="0" max="99" value={bondCount} onInput={e => setBondCount(e.currentTarget.value)} />
+              <button type="button" disabled={actionLoading === 'bond'} onClick={() => doAction('bond', 'SET_BOND_STACK', { bondId: bondId || chess?.bonds[0]?.bondId || '', count: Number(bondCount || 1) })}>{actionLoading === 'bond' ? '执行中' : '设置'}</button>
+              <Result k="bond" />
+            </label>
+          </div>
+        </section>
+
+        <section class="admin-command-panel">
+          <div class="admin-panel-title">
+            <h4>添加棋子</h4>
+            <span>{chess ? `${chess.chars.length} 名干员 · ${chess.traps.length} 件道具` : '正在读取赛季列表'}</span>
+          </div>
+          <div class="admin-chess-picker">
+            <input class="input-field" value={chessSearch} placeholder="搜索真名、道具名或 ID" onInput={e => setChessSearch(e.currentTarget.value)} />
+            <select class="select-field" size={8} value={chessId} onChange={e => setChessId(e.currentTarget.value)}>
+              {visibleChess.map(item => (
+                <option key={item.chessId} value={item.chessId}>
+                  {item.itemType ? '道具 · ' : '干员 · '}{chessDisplayName(item)}
+                </option>
+              ))}
+              {!chess && <option value="">加载中</option>}
+            </select>
+            <button type="button" disabled={actionLoading === 'chess' || !chessId} onClick={() => doAction('chess', 'ADD_CHESS', chessId || visibleChess[0]?.chessId || '')}>
+              {actionLoading === 'chess' ? '添加中' : '添加到备战区'}
+            </button>
+            <Result k="chess" />
+          </div>
+        </section>
+      </div>
+
+      <section class="admin-command-panel">
+        <div class="admin-panel-title">
+          <h4>流程控制</h4>
+          <span>当前阶段：{sceneLabel(selectedConn.players[0]?.state ?? selectedConn.teamState)}</span>
+        </div>
+        <div class="admin-danger-actions">
+          <button type="button" disabled={actionLoading === 'forceend'} onClick={() => doAction('forceend', 'FORCE_END_PHASE')}>结束当前阶段</button>
+          <button type="button" disabled={actionLoading === 'forcelogin'} onClick={() => doAction('forcelogin', 'FORCE_LOGIN')}>退回登录页</button>
+          <button type="button" disabled={actionLoading === 'dissolve'} onClick={() => doAction('dissolve', 'DISSOLVE_TEAM')}>解散队伍</button>
+          <Result k="forceend" />
+          <Result k="forcelogin" />
+          <Result k="dissolve" />
+        </div>
+      </section>
+
+      <section class="admin-command-panel">
+        <div class="admin-panel-title">
+          <h4>快照</h4>
+          <span>{(snapshots[selectedTeam] || []).length} 条可用</span>
+        </div>
+        <div class="admin-snapshot-toolbar">
+          <button type="button" onClick={() => loadSnapshots(selectedTeam)}>刷新</button>
+          <button type="button" disabled={transferLoading === `import:${selectedTeam}`} onClick={() => uploadInputRef.current?.click()}>
+            {transferLoading === `import:${selectedTeam}` ? '导入中' : '导入快照'}
+          </button>
+          <input
+            ref={uploadInputRef}
+            type="file"
+            accept=".bin,application/octet-stream"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const file = (e.currentTarget as HTMLInputElement).files?.[0];
+              if (file) doImportSnapshot(file);
+              (e.currentTarget as HTMLInputElement).value = '';
+            }}
+          />
+          <Result k="snapshot" />
+        </div>
+        <div class="admin-snapshot-list">
+          {(snapshots[selectedTeam] || []).slice().sort((a, b) => b.ts - a.ts).length === 0 ? (
+            <div class="admin-snapshot-empty">暂无快照</div>
+          ) : (
+            (snapshots[selectedTeam] || []).slice().sort((a, b) => b.ts - a.ts).map(snapshot => (
+              <div class="admin-snapshot-item" key={snapshot.key}>
+                <div class="admin-snapshot-meta">
+                  <strong>第 {snapshot.round} 回合 · {sceneLabel(snapshot.sceneState)}</strong>
+                  <span>{relativeTime(snapshot.ts)}</span>
+                  <code>{snapshot.key}</code>
+                </div>
+                <div class="admin-snapshot-actions">
+                  <button type="button" disabled={transferLoading === `download:${snapshot.key}`} onClick={() => doDownloadSnapshot(snapshot)}>
+                    {transferLoading === `download:${snapshot.key}` ? '下载中' : '下载'}
+                  </button>
+                  <button type="button" disabled={rollbackLoading === snapshot.key} onClick={() => doRollback(snapshot.key)}>
+                    {rollbackLoading === snapshot.key ? '回滚中' : '回滚'}
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function LegacyCheatConsole({ jwt }: { jwt: string }) {
   const [connections, setConnections] = useState<CheatConnection[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [chessListCache, setChessListCache] = useState<Record<string, { chars: ChessItem[]; traps: ChessItem[]; bonds: BondItem[] }>>({});
@@ -1130,6 +1512,8 @@ function CheatConsole({ jwt }: { jwt: string }) {
     </div>
   );
 }
+
+void LegacyCheatConsole;
 
 // ─── 快照回滚组件 ─────────────────────────────────────────────────────────
 

@@ -601,6 +601,257 @@ body[data-theme="pink"] .detail-back {
   justify-content: flex-end;
 }
 
+.admin-tools-v2 {
+  animation: panelIn 0.24s ease both;
+}
+
+.admin-tools-v2 button {
+  min-height: 34px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-strong);
+  color: var(--color-primary);
+  font: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease, opacity 0.16s ease;
+}
+
+.admin-tools-v2 button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--color-primary-mid);
+  background: var(--color-primary-dim);
+}
+
+.admin-tools-v2 button:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}
+
+.admin-hero,
+.admin-command-panel {
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-panel);
+  background: color-mix(in srgb, var(--color-surface) 92%, transparent);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
+}
+
+.admin-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+}
+
+.admin-kicker,
+.admin-panel-title span,
+.admin-hero-meta,
+.admin-player-chip span {
+  font-size: 0.68rem;
+  opacity: 0.58;
+}
+
+.admin-hero h3,
+.admin-panel-title h4 {
+  margin: 4px 0 0;
+  font-size: 1rem;
+  letter-spacing: 0;
+}
+
+.admin-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.admin-hero-meta span {
+  padding: 3px 8px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: 999px;
+}
+
+.admin-hero-meta .live {
+  color: var(--color-primary);
+  border-color: var(--color-primary-mid);
+  animation: adminPulse 1.4s ease-in-out infinite;
+}
+
+.admin-hero-meta .danger {
+  color: #ff6b6b;
+  border-color: rgba(255, 77, 77, 0.35);
+}
+
+.admin-team-tabs {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-team-tabs button {
+  display: grid;
+  gap: 2px;
+  min-width: 96px;
+  text-align: left;
+}
+
+.admin-team-tabs button span {
+  font-size: 0.58rem;
+  opacity: 0.55;
+}
+
+.admin-team-tabs button.active {
+  border-color: var(--color-primary);
+  background: var(--color-primary-dim);
+}
+
+.admin-player-strip {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.admin-player-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  padding: 10px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  animation: panelIn 0.2s ease both;
+}
+
+.admin-player-chip strong {
+  font-size: 0.78rem;
+}
+
+.admin-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.9fr);
+  gap: 14px;
+}
+
+.admin-command-panel {
+  padding: 14px;
+}
+
+.admin-panel-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.admin-panel-title h4 {
+  font-size: 0.86rem;
+}
+
+.admin-command-list {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-command-list label {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.admin-command-list label > span:first-child {
+  font-size: 0.72rem;
+  opacity: 0.72;
+}
+
+.admin-command-list .compact {
+  max-width: 74px;
+}
+
+.admin-chess-picker {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-chess-picker select {
+  min-height: 220px;
+  overflow: auto;
+}
+
+.admin-danger-actions,
+.admin-snapshot-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-danger-actions button:nth-child(2),
+.admin-danger-actions button:nth-child(3) {
+  color: #ff8f8f;
+  border-color: rgba(255, 77, 77, 0.42);
+}
+
+.admin-result {
+  grid-column: 2 / -1;
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 0.64rem;
+  animation: adminResultIn 0.18s ease both;
+}
+
+.admin-result.ok {
+  color: var(--color-primary);
+  background: var(--color-primary-dim);
+  border: 1px solid var(--color-primary-mid);
+}
+
+.admin-result.bad {
+  color: #ff8f8f;
+  background: rgba(255, 77, 77, 0.08);
+  border: 1px solid rgba(255, 77, 77, 0.35);
+}
+
+.admin-snapshot-toolbar {
+  margin-bottom: 10px;
+}
+
+.admin-tools-v2 .admin-snapshot-actions button,
+.admin-tools-v2 .admin-snapshot-toolbar button {
+  min-height: 30px;
+}
+
+@keyframes adminPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 rgba(255, 255, 255, 0);
+  }
+  50% {
+    box-shadow: 0 0 16px var(--color-primary-dim);
+  }
+}
+
+@keyframes adminResultIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* 科幻卡片 */
 .cyber-section {
   background: var(--color-bg-card);
@@ -1374,6 +1625,48 @@ body[data-theme="pink"] .settlement-history-row:hover {
 
   .admin-snapshot-actions .input-field {
     flex: 1 1 120px;
+  }
+
+  .admin-hero {
+    flex-direction: column;
+  }
+
+  .admin-team-tabs {
+    justify-content: stretch;
+  }
+
+  .admin-team-tabs button {
+    flex: 1 1 120px;
+  }
+
+  .admin-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-command-list label {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .admin-command-list .compact {
+    max-width: none;
+  }
+
+  .admin-player-chip {
+    align-items: flex-start;
+    flex-direction: column;
+    min-width: 160px;
+  }
+
+  .admin-danger-actions,
+  .admin-snapshot-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-danger-actions button,
+  .admin-snapshot-toolbar button {
+    width: 100%;
   }
 
   .settlement-chart-card {
