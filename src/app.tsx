@@ -893,7 +893,7 @@ function CheatConsole({ jwt }: { jwt: string }) {
                 onClick={() => setSelectedTeamId(conn.teamId)}
               >
                 {conn.nickname ?? conn.players[0]?.nickName ?? '队伍'}
-                <span>{conn.inBattle ? `R${conn.round ?? '-'}` : `${conn.players.length}人`}</span>
+                <span>队内 {conn.players.length} 人 · {conn.inBattle ? `R${conn.round ?? '-'}` : conn.teamState}</span>
               </button>
             ))}
           </div>
@@ -963,14 +963,30 @@ function CheatConsole({ jwt }: { jwt: string }) {
           </div>
           <div class="admin-chess-picker">
             <input class="input-field" value={chessSearch} placeholder="搜索真名、道具名或 ID" onInput={e => setChessSearch(e.currentTarget.value)} />
-            <select class="select-field" size={8} value={chessId} onChange={e => setChessId(e.currentTarget.value)}>
-              {visibleChess.map(item => (
-                <option key={item.chessId} value={item.chessId}>
-                  {item.itemType ? '道具 · ' : '干员 · '}{chessDisplayName(item)}
-                </option>
-              ))}
-              {!chess && <option value="">加载中</option>}
-            </select>
+            <div class="admin-chess-results" role="listbox" aria-label="选择要添加的棋子">
+              {!chess ? (
+                <div class="admin-chess-empty">加载中</div>
+              ) : visibleChess.length === 0 ? (
+                <div class="admin-chess-empty">没有匹配的棋子</div>
+              ) : visibleChess.map(item => {
+                const display = chessDisplayName(item);
+                const [name, rawId] = display.endsWith(')') ? display.split(' (') : [display, item.chessId];
+                return (
+                  <button
+                    key={item.chessId}
+                    type="button"
+                    class={`admin-chess-option ${chessId === item.chessId ? 'active' : ''}`}
+                    role="option"
+                    aria-selected={chessId === item.chessId}
+                    onClick={() => setChessId(item.chessId)}
+                  >
+                    <span class="admin-chess-type">{item.itemType ? (item.itemType === 'MAGIC' ? '法术' : '道具') : '干员'}</span>
+                    <strong>{name}</strong>
+                    <small>{rawId.replace(/\)$/, '')}</small>
+                  </button>
+                );
+              })}
+            </div>
             <button type="button" disabled={actionLoading === 'chess' || !chessId} onClick={() => doAction('chess', 'ADD_CHESS', chessId || visibleChess[0]?.chessId || '')}>
               {actionLoading === 'chess' ? '添加中' : '添加到备战区'}
             </button>
