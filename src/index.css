@@ -606,7 +606,6 @@ body[data-theme="pink"] .detail-back {
 }
 
 .admin-tools-v2 button {
-  min-height: 34px;
   padding: 6px 12px;
   border: 1px solid var(--color-border-soft);
   border-radius: var(--radius-control);
