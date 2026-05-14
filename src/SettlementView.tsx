@@ -13,23 +13,23 @@ import {
 } from './api';
 import { CHARACTER_NAME_MAP } from './constants';
 
-const GREEN_SHADES = [
-  '#00ff9d', '#00e88a', '#00d078', '#00b866', '#00a055',
-  '#40ffb8', '#33cc80', '#00994d', '#008040', '#006633',
-  '#20d090', '#50e0a0', '#60f0b0', '#80ffc0', '#a0ffd0',
+const PLAYER_SHADES = [
+  '#f5f7fa', '#cfd4dc', '#aeb5c0', '#8f96a1', '#6f7782',
+  '#ffffff', '#d9dde4', '#b9c0ca', '#969da8', '#767e89',
+  '#e9eef5', '#c4cad4', '#a1a9b4', '#858d99', '#656d78',
 ];
-function playerColor(i: number) { return GREEN_SHADES[i % GREEN_SHADES.length]; }
+function playerColor(i: number) { return PLAYER_SHADES[i % PLAYER_SHADES.length]; }
 
 const LINE_COLORS = [
-  '#00ff9d', '#66ff66', '#00e5ff', '#448aff', '#b388ff', '#ff80ab', '#ffab40', '#69f0ae',
-  '#ffd740', '#40c4ff', '#ea80fc', '#ff8a80', '#b2ff59', '#ff6e40', '#84ffff', '#ff4081',
+  '#f5f7fa', '#b8c1cf', '#7ee7ff', '#a7b0bd', '#d7dce5', '#ff80ab', '#ffab40', '#9aa3af',
+  '#ffd740', '#40c4ff', '#ea80fc', '#ff8a80', '#c5cad3', '#ff6e40', '#84ffff', '#ff4081',
 ];
 
-const BG = '#010805';
-const FG = '#00ff9d';
-const FG_DIM = 'rgba(0,255,157,0.2)';
-const FG_GRID = 'rgba(0,255,157,0.06)';
-const ttStyles = { ...defaultStyles, background: BG, border: `1px solid ${FG}`, borderRadius: 0, color: FG, fontSize: '0.7rem', fontFamily: "'PingFang SC','Microsoft YaHei',sans-serif" };
+const BG = '#050607';
+const FG = '#f5f7fa';
+const FG_DIM = 'rgba(255,255,255,0.22)';
+const FG_GRID = 'rgba(255,255,255,0.07)';
+const ttStyles = { ...defaultStyles, background: BG, border: `1px solid ${FG}`, borderRadius: 10, color: FG, fontSize: '0.7rem', fontFamily: "'PingFang SC','Microsoft YaHei',sans-serif" };
 const axisLabel = { fill: FG, fontSize: '0.6rem' as const, fontFamily: "'PingFang SC','Microsoft YaHei',sans-serif" as const };
 const axisLabelLeft = { ...axisLabel, textAnchor: 'end' as const, dy: '0.3em' as const, dx: -4 };
 
@@ -54,7 +54,7 @@ const StackedBarInner = ({
       p.characters.forEach(c => { const n = entityName(c.charId); allKeys.add(n); row[n] = c.totalDamage; });
       rows.push(row);
     });
-    return { stackedData: rows, charKeys: Array.from(allKeys), colorScale: scaleOrdinal({ domain: Array.from(allKeys), range: GREEN_SHADES }) };
+    return { stackedData: rows, charKeys: Array.from(allKeys), colorScale: scaleOrdinal({ domain: Array.from(allKeys), range: PLAYER_SHADES }) };
   }, [players]);
 
   if (width < 10) return null;
@@ -287,7 +287,7 @@ function BoardLayout({ player, color }: { player: Settlement['players'][number];
           const it = map.get(`${x},${y}`); const empty = !it;
           const equips = it?.equips.map(eq => entityName(eq.charId)) ?? [];
           return <div key={`${x},${y}`} title={empty ? `(${x},${y})` : `${entityName(it.cid)} (${player.nickName})${equips.length ? `\n装备: ${equips.join(' / ')}` : ''}`}
-            style={{ width: cs, minHeight: cs, border: `1px solid ${empty ? 'rgba(0,255,157,0.1)' : color}`, background: empty ? 'rgba(0,255,157,0.02)' : `${color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.max(7, cs * 0.2), color: empty ? 'rgba(0,255,157,0.3)' : color, overflow: 'hidden', textAlign: 'center', lineHeight: 1.15, padding: empty ? 0 : '3px' }}>
+            style={{ width: cs, minHeight: cs, border: `1px solid ${empty ? 'rgba(255,255,255,0.12)' : color}`, background: empty ? 'rgba(255,255,255,0.025)' : `${color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.max(7, cs * 0.2), color: empty ? 'rgba(255,255,255,0.3)' : color, overflow: 'hidden', textAlign: 'center', lineHeight: 1.15, padding: empty ? 0 : '3px', borderRadius: 8 }}>
             {empty ? `${x},${y}` : (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
                 <span>{entityName(it.cid)}</span>
@@ -396,8 +396,12 @@ export function SettlementView({ jwt }: { jwt: string }) {
   const TABS = { latest: '最新结算', history: '历史记录', search: '按队伍ID查询' } as const;
 
   return (
-    <section class="cyber-section" style={{ overflow: 'visible' }}>
-      <h2 class="section-title">结算数据 <span>SETTLEMENT_DB</span></h2>
+    <section class="cyber-section settlement-section">
+      <div class="detail-header">
+        <h2>结算数据</h2>
+        <span>SETTLEMENT_DB</span>
+      </div>
+      <div class="detail-body">
       <div style={{ display: 'flex', gap: '4px', marginBottom: '20px', flexWrap: 'wrap' }}>
         {(Object.keys(TABS) as (keyof typeof TABS)[]).map(k => (
           <button key={k} class="input-field" style={{ cursor: 'pointer', padding: '6px 16px', fontSize: '0.75rem', background: tab === k ? 'var(--color-primary-dim)' : 'transparent', borderColor: tab === k ? 'var(--color-primary)' : 'var(--color-primary-mid)' }} onClick={() => onTab(k)}>{TABS[k]}</button>
@@ -416,7 +420,7 @@ export function SettlementView({ jwt }: { jwt: string }) {
         <div>
           {summaries.length === 0 ? <div style={{ opacity: 0.5, textAlign: 'center', padding: '20px', fontSize: '0.8rem' }}>暂无结算记录</div> : <div style={{ marginBottom: '16px', fontSize: '0.7rem', opacity: 0.5 }}>共 {summaries.length} 条记录（最多保留20条）</div>}
           {summaries.map(s => (
-            <div key={s.teamId} class="settlement-history-row" style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '10px 12px', borderBottom: '1px solid rgba(0,255,157,0.06)', cursor: 'pointer' }}
+            <div key={s.teamId} class="settlement-history-row" style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.07)', cursor: 'pointer' }}
               onClick={async () => { setLoading(true); setError(null); try { const data = await fetchSettlementByTeamId(jwt, s.teamId); setSettlements(data); setSelectedBossIdx(0); setTab('search'); setTeamIdInput(s.teamId); } catch (e: any) { setError(e.message); } finally { setLoading(false); } }}>
               <span style={{ fontFamily: 'monospace', fontSize: '0.7rem', opacity: 0.6, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.teamId.slice(0, 24)}...</span>
               <span style={{ fontSize: '0.7rem', opacity: 0.5 }}>{s.modeId}</span>
@@ -432,7 +436,7 @@ export function SettlementView({ jwt }: { jwt: string }) {
         <div>
           <BossSelector settlements={settlements} selectedIdx={selectedBossIdx} onChange={setSelectedBossIdx} />
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px', padding: '12px', marginBottom: '20px', background: 'rgba(0,255,157,0.03)', border: '1px solid rgba(0,255,157,0.1)', fontSize: '0.7rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px', padding: '12px', marginBottom: '20px', background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, fontSize: '0.7rem' }}>
             <div><span style={{ opacity: 0.5 }}>Team:</span> <span style={{ fontFamily: 'monospace' }}>{settlement.teamId.slice(0, 16)}...</span></div>
             <div><span style={{ opacity: 0.5 }}>Mode:</span> {settlement.modeId}</div>
             <div><span style={{ opacity: 0.5 }}>Boss:</span> {settlement.bossId}</div>
@@ -475,8 +479,8 @@ export function SettlementView({ jwt }: { jwt: string }) {
             <div class="settlement-chart-card" style={{ marginTop: '16px' }}>
               <div class="settlement-chart-header"><span>盟约叠层</span><span class="settlement-chart-sub">{bondMap.size} 种盟约</span></div>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.7rem' }}>
-                <thead><tr style={{ borderBottom: '1px solid rgba(0,255,157,0.15)', opacity: 0.6 }}><th style={{ textAlign: 'left', padding: '4px 8px' }}>盟约</th>{settlement.players.map((p, i) => <th key={p.uid} style={{ textAlign: 'center', padding: '4px 8px', color: playerColor(i) }}>{p.nickName}</th>)}</tr></thead>
-                <tbody>{Array.from(bondMap.values()).map(b => <tr key={b.bid} style={{ borderBottom: '1px solid rgba(0,255,157,0.04)' }}><td style={{ padding: '4px 8px', fontFamily: 'monospace' }}>{b.bid}</td>{settlement.players.map(p => <td key={p.uid} style={{ textAlign: 'center', padding: '4px 8px' }}>{b.layers[p.nickName] ?? 0}</td>)}</tr>)}</tbody>
+                <thead><tr style={{ borderBottom: '1px solid rgba(255,255,255,0.14)', opacity: 0.6 }}><th style={{ textAlign: 'left', padding: '4px 8px' }}>盟约</th>{settlement.players.map((p, i) => <th key={p.uid} style={{ textAlign: 'center', padding: '4px 8px', color: playerColor(i) }}>{p.nickName}</th>)}</tr></thead>
+                <tbody>{Array.from(bondMap.values()).map(b => <tr key={b.bid} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}><td style={{ padding: '4px 8px', fontFamily: 'monospace' }}>{b.bid}</td>{settlement.players.map(p => <td key={p.uid} style={{ textAlign: 'center', padding: '4px 8px' }}>{b.layers[p.nickName] ?? 0}</td>)}</tr>)}</tbody>
               </table>
             </div>
           )}
@@ -484,6 +488,7 @@ export function SettlementView({ jwt }: { jwt: string }) {
       )}
 
       {tab !== 'history' && !loading && !error && !settlement && <div style={{ opacity: 0.5, textAlign: 'center', padding: '30px', fontSize: '0.8rem' }}>暂无数据</div>}
+      </div>
     </section>
   );
 }

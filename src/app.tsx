@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
+import { ArrowLeft20Regular, ChevronRight20Regular } from '@fluentui/react-icons';
 import { type Settings, type SeasonMeta, fetchSettings, updateSetting, fetchSeasons, uploadSeason, deleteSeason, fetchCheatStatus, fetchChessList, executeCheatAction, kickPlayer, type CheatConnection, type ChessItem, type BondItem, fetchTeams, fetchSnapshots, rollbackToSnapshot, downloadSnapshot, importSnapshot, type TeamInfo, type SnapshotMeta } from './api';
 import { MAPS, NAME_CARDS } from './constants';
 import { SecretarySelector } from './SecretarySelector';
@@ -66,6 +67,57 @@ function DeferredNumberInput({
       }}
       disabled={disabled}
     />
+  );
+}
+
+function SettingsSectionItem({
+  title,
+  code,
+  description,
+  onClick,
+}: {
+  title: preact.ComponentChildren;
+  code?: preact.ComponentChildren;
+  description: preact.ComponentChildren;
+  onClick: () => void;
+}) {
+  return (
+    <button type="button" class="settings-section-item dashboard-panel" onClick={onClick}>
+      <span class="settings-section-copy">
+        <span class="settings-section-title-row">
+          <span class="settings-section-title">{title}</span>
+          {code && <span class="settings-section-code">{code}</span>}
+        </span>
+        <span class="settings-section-description">{description}</span>
+      </span>
+      <span class="settings-section-icon"><ChevronRight20Regular /></span>
+    </button>
+  );
+}
+
+function DashboardDetail({
+  title,
+  code,
+  onBack,
+  children,
+}: {
+  title: preact.ComponentChildren;
+  code?: preact.ComponentChildren;
+  onBack: () => void;
+  children: preact.ComponentChildren;
+}) {
+  return (
+    <section class="cyber-section dashboard-detail dashboard-panel">
+      <button type="button" class="detail-back" onClick={onBack}>
+        <ArrowLeft20Regular />
+        <span>返回</span>
+      </button>
+      <div class="detail-header">
+        <h2>{title}</h2>
+        {code && <span>{code}</span>}
+      </div>
+      <div class="detail-body">{children}</div>
+    </section>
   );
 }
 
@@ -157,7 +209,7 @@ function SeasonManager({ jwt, myUserId, currentSeasonId, onSeasonChange }: {
     return (
       <tr key={s.id} style={{
         borderBottom: '1px solid rgba(255,255,255,0.05)',
-        background: isActive ? 'rgba(0,255,180,0.06)' : undefined,
+        background: isActive ? 'rgba(255,255,255,0.07)' : undefined,
       }}>
         <td style={{ padding: '6px 8px' }}>
           {s.name}
@@ -187,9 +239,7 @@ function SeasonManager({ jwt, myUserId, currentSeasonId, onSeasonChange }: {
   };
 
   return (
-    <section class="cyber-section">
-      <h2 class="section-title">赛季管理 <span>SEASON_MGR</span></h2>
-
+    <>
       {loading ? (
         <div style={{ opacity: 0.5, fontSize: '0.8rem' }}>加载中...</div>
       ) : error ? (
@@ -260,7 +310,7 @@ function SeasonManager({ jwt, myUserId, currentSeasonId, onSeasonChange }: {
                       <input class="input-field" type="file" accept=".json" required style={{ width: '100%', cursor: 'pointer' }} />
                     </div>
                     {uploadError && <div style={{ color: '#ff4d4d', fontSize: '0.75rem' }}>{uploadError}</div>}
-                    {uploadSuccess && <div style={{ color: '#4dff88', fontSize: '0.75rem' }}>{uploadSuccess}</div>}
+                    {uploadSuccess && <div style={{ color: 'var(--color-primary)', fontSize: '0.75rem' }}>{uploadSuccess}</div>}
                     <button class="input-field" type="submit" disabled={uploading}
                       style={{ cursor: 'pointer', background: 'var(--color-primary-dim)', fontWeight: 'bold', border: '2px solid var(--color-primary)' }}>
                       {uploading ? '上传中...' : (myUploadedSeason ? '替换赛季' : '上传赛季')}
@@ -272,7 +322,7 @@ function SeasonManager({ jwt, myUserId, currentSeasonId, onSeasonChange }: {
           </div>
         </div>
       )}
-    </section>
+    </>
   );
 }
 
@@ -364,18 +414,14 @@ function CheatConsole({ jwt }: { jwt: string }) {
     const r = actionResult[k];
     if (!r) return null;
     return (
-      <span style={{ fontSize: '0.65rem', marginLeft: '8px', color: r.ok ? '#00ff9d' : '#ff4d4d' }}>
+      <span style={{ fontSize: '0.65rem', marginLeft: '8px', color: r.ok ? 'var(--color-primary)' : '#ff4d4d' }}>
         {r.ok ? '✓' : '✗'} {r.msg}
       </span>
     );
   };
 
   return (
-    <section class="cyber-section">
-      <h2 class="section-title" style={{ color: '#ff4d4d', borderBottomColor: '#ff4d4d' }}>
-        作弊控制台 <span style={{ color: '#ff4d4d' }}>CHEAT_SYS</span>
-      </h2>
-
+    <>
       <div style={{ fontSize: '0.7rem', opacity: 0.5, marginBottom: '12px' }}>
         轮询间隔 2s · 在线连接：{connections.length} 个
         {connections.some(conn => conn.isAdmin) && <span style={{ color: '#7ee7ff', marginLeft: '8px' }}>管理员视图 · 显示全部队伍</span>}
@@ -397,8 +443,8 @@ function CheatConsole({ jwt }: { jwt: string }) {
               onClick={() => toggleExpand(conn.teamId)}>
               <span style={{
                 display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%',
-                background: conn.inBattle ? '#00ff9d' : '#ffaa00',
-                boxShadow: conn.inBattle ? '0 0 6px #00ff9d' : '0 0 6px #ffaa00',
+                background: conn.inBattle ? 'var(--color-primary)' : '#ffaa00',
+                boxShadow: conn.inBattle ? '0 0 8px rgba(255,255,255,0.45)' : '0 0 6px #ffaa00',
               }} />
               <span style={{ fontWeight: 'bold', fontSize: '0.85rem' }}>{conn.nickname ?? conn.players[0]?.nickName ?? 'UNKNOWN'}</span>
               <span style={{ fontSize: '0.65rem', opacity: 0.5 }}>
@@ -452,7 +498,7 @@ function CheatConsole({ jwt }: { jwt: string }) {
               <div style={{ borderTop: '1px solid rgba(255,77,77,0.2)', paddingTop: '10px', marginTop: '6px' }}>
 
                 {/* 调整金币 */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px dashed rgba(0,255,157,0.08)', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px dashed var(--color-primary-dim)', flexWrap: 'wrap' }}>
                   <span style={{ fontSize: '0.7rem', opacity: 0.6, minWidth: '70px' }}>调整金币</span>
                   <input class="input-field" type="number" min="0" max="999"
                     style={{ width: '70px', padding: '3px 6px', fontSize: '0.75rem' }}
@@ -469,7 +515,7 @@ function CheatConsole({ jwt }: { jwt: string }) {
                 </div>
 
                 {/* 调整 HP */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px dashed rgba(0,255,157,0.08)', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px dashed var(--color-primary-dim)', flexWrap: 'wrap' }}>
                   <span style={{ fontSize: '0.7rem', opacity: 0.6, minWidth: '70px' }}>调整 HP</span>
                   <input class="input-field" type="number" min="0" max="9999"
                     style={{ width: '70px', padding: '3px 6px', fontSize: '0.75rem' }}
@@ -486,7 +532,7 @@ function CheatConsole({ jwt }: { jwt: string }) {
                 </div>
 
                 {/* 调整回合（整个 team） */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px dashed rgba(0,255,157,0.08)', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px dashed var(--color-primary-dim)', flexWrap: 'wrap' }}>
                   <span style={{ fontSize: '0.7rem', opacity: 0.6, minWidth: '70px' }}>调整回合</span>
                   <input class="input-field" type="number" min="1" max="15"
                     style={{ width: '60px', padding: '3px 6px', fontSize: '0.75rem' }}
@@ -504,7 +550,7 @@ function CheatConsole({ jwt }: { jwt: string }) {
                 </div>
 
                 {/* 调整盟约叠层 */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px dashed rgba(0,255,157,0.08)', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px dashed var(--color-primary-dim)', flexWrap: 'wrap' }}>
                   <span style={{ fontSize: '0.7rem', opacity: 0.6, minWidth: '70px' }}>盟约叠层</span>
                   <select class="select-field"
                     style={{ flex: 1, padding: '3px 6px', fontSize: '0.7rem', minWidth: '120px' }}
@@ -532,7 +578,7 @@ function CheatConsole({ jwt }: { jwt: string }) {
                 </div>
 
                 {/* 添加棋子 */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px dashed rgba(0,255,157,0.08)', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px dashed var(--color-primary-dim)', flexWrap: 'wrap' }}>
                   <span style={{ fontSize: '0.7rem', opacity: 0.6, minWidth: '70px' }}>添加棋子</span>
                   <select class="select-field"
                     style={{ flex: 1, padding: '3px 6px', fontSize: '0.7rem', minWidth: '140px' }}
@@ -588,7 +634,7 @@ function CheatConsole({ jwt }: { jwt: string }) {
           </div>
         );
       })}
-    </section>
+    </>
   );
 }
 
@@ -743,11 +789,7 @@ function SnapshotRollback({ jwt }: { jwt: string }) {
   };
 
   return (
-    <section class="cyber-section">
-      <h2 class="section-title" style={{ color: '#ffaa00', borderBottomColor: '#ffaa00' }}>
-        快照回滚 <span style={{ color: '#ffaa00' }}>SNAPSHOT_SYS</span>
-      </h2>
-
+    <>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
         <span style={{ fontSize: '0.7rem', opacity: 0.5 }}>活跃队伍：{teams.length} 个</span>
         {teams.some(team => team.isAdmin) && <span style={{ fontSize: '0.7rem', color: '#7ee7ff' }}>管理员视图 · 显示全部队伍</span>}
@@ -756,7 +798,7 @@ function SnapshotRollback({ jwt }: { jwt: string }) {
           {loading ? '加载中...' : '刷新'}
         </button>
         {result && (
-          <span style={{ fontSize: '0.7rem', color: result.ok ? '#00ff9d' : '#ff4d4d' }}>
+          <span style={{ fontSize: '0.7rem', color: result.ok ? 'var(--color-primary)' : '#ff4d4d' }}>
             {result.ok ? '✓' : '✗'} {result.msg}
           </span>
         )}
@@ -770,13 +812,13 @@ function SnapshotRollback({ jwt }: { jwt: string }) {
         const isExpanded = expandedTeam === team.teamId;
         const teamSnapshots = (snapshots[team.teamId] || []).slice().sort((a, b) => b.ts - a.ts);
         return (
-          <div key={team.teamId} style={{ marginBottom: '12px', border: '1px solid rgba(255,170,0,0.2)', padding: '10px' }}>
+          <div key={team.teamId} style={{ marginBottom: '12px', border: '1px solid var(--color-primary-dim)', borderRadius: 10, padding: '10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
               onClick={() => toggleTeam(team.teamId)}>
               <span style={{
                 display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%',
-                background: team.state === 'IN_BATTLE' ? '#00ff9d' : '#ffaa00',
-                boxShadow: `0 0 6px ${team.state === 'IN_BATTLE' ? '#00ff9d' : '#ffaa00'}`,
+                background: team.state === 'IN_BATTLE' ? 'var(--color-primary)' : '#ffaa00',
+                boxShadow: team.state === 'IN_BATTLE' ? '0 0 8px rgba(255,255,255,0.45)' : '0 0 6px #ffaa00',
               }} />
               <span style={{ fontWeight: 'bold', fontSize: '0.8rem' }}>{team.teamId.slice(0, 12)}...</span>
                 <span style={{ fontSize: '0.65rem', opacity: 0.5 }}>
@@ -810,7 +852,7 @@ function SnapshotRollback({ jwt }: { jwt: string }) {
             </div>
 
             {isExpanded && (
-              <div style={{ marginTop: '10px', borderTop: '1px solid rgba(255,170,0,0.15)', paddingTop: '8px' }}>
+              <div style={{ marginTop: '10px', borderTop: '1px solid var(--color-primary-dim)', paddingTop: '8px' }}>
                 {teamSnapshots.length === 0 ? (
                   <div style={{ fontSize: '0.75rem', opacity: 0.4, textAlign: 'center', padding: '10px 0' }}>无可用快照（快照在 20 分钟后过期）</div>
                 ) : (
@@ -823,23 +865,24 @@ function SnapshotRollback({ jwt }: { jwt: string }) {
                         alignItems: 'center',
                         gap: '12px',
                         padding: '10px 12px',
-                        background: 'linear-gradient(90deg, rgba(255,170,0,0.08), rgba(255,255,255,0.02))',
-                        border: '1px solid rgba(255,170,0,0.16)',
+                        background: 'linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))',
+                        border: '1px solid var(--color-primary-dim)',
+                        borderRadius: 10,
                         marginBottom: '6px',
                         fontSize: '0.75rem',
                       }}
                     >
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                          <span style={{ color: '#ffd36b', fontWeight: 'bold', letterSpacing: '0.04em' }}>
+                          <span style={{ color: 'var(--color-primary)', fontWeight: 'bold', letterSpacing: '0.04em' }}>
                             {formatSnapshotState(s.round, s.sceneState)}
                           </span>
                           <span style={{
                             fontSize: '0.65rem',
                             padding: '1px 8px',
-                            border: '1px solid rgba(255,170,0,0.25)',
-                            background: 'rgba(255,170,0,0.08)',
-                            color: 'rgba(255,240,200,0.88)',
+                            border: '1px solid var(--color-primary-mid)',
+                            background: 'var(--color-primary-dim)',
+                            color: 'var(--color-primary)',
                           }}>
                             {formatRelativeTime(s.ts)}
                           </span>
@@ -866,8 +909,8 @@ function SnapshotRollback({ jwt }: { jwt: string }) {
                             cursor: 'pointer',
                             padding: '4px 12px',
                             fontSize: '0.68rem',
-                            color: '#ffaa00',
-                            border: '1px solid #ffaa00',
+                            color: 'var(--color-primary)',
+                            border: '1px solid var(--color-primary-mid)',
                           }}
                           disabled={rollbackLoading === s.key}
                           onClick={() => doRollback(team.teamId, s.key)}>
@@ -882,7 +925,7 @@ function SnapshotRollback({ jwt }: { jwt: string }) {
           </div>
         );
       })}
-    </section>
+    </>
   );
 }
 
@@ -894,6 +937,7 @@ export function App() {
   const [updating, setUpdating] = useState<string | null>(null);
   const [userData, setUserData] = useState<JwtPayload | null>(null);
   const [page, setPage] = useState<'dashboard' | 'settlement'>('dashboard');
+  const [dashboardPanel, setDashboardPanel] = useState<'core' | 'maps' | 'skins' | 'season' | 'tools' | null>(null);
 
   useEffect(() => {
     if (jwt) {
@@ -1068,7 +1112,7 @@ export function App() {
       <nav class="page-nav">
         <button
           class={`page-nav-btn ${page === 'dashboard' ? 'active' : ''}`}
-          onClick={() => setPage('dashboard')}
+          onClick={() => { setPage('dashboard'); setDashboardPanel(null); }}
         >
           控制面板 <span>DASHBOARD</span>
         </button>
@@ -1081,11 +1125,42 @@ export function App() {
       </nav>
 
       {page === 'dashboard' ? (
-        <div class="container">
-          {/* 配置区 */}
-          <aside class="cyber-section">
-            <h2 class="section-title">核心参数 <span>CORE_V1.0</span></h2>
-            
+        <div class="container dashboard-container">
+          {dashboardPanel === null ? (
+            <section class="cyber-section settings-home">
+              <SettingsSectionItem
+                title="核心参数"
+                code="CORE_V1.0"
+                description="配置回合限时、共享池、公开权限、人数上限、重复盟约和助理干员。"
+                onClick={() => setDashboardPanel('core')}
+              />
+              <SettingsSectionItem
+                title="授权战区地图"
+                code="MAP_AUTH"
+                description="选择当前房间允许出现的地图池。"
+                onClick={() => setDashboardPanel('maps')}
+              />
+              <SettingsSectionItem
+                title="身份标识涂装"
+                code="ID_SKINS"
+                description="切换房间使用的身份牌和展示外观。"
+                onClick={() => setDashboardPanel('skins')}
+              />
+              <SettingsSectionItem
+                title="赛季管理"
+                code="SEASON_MGR"
+                description="查看内置赛季、启用赛季版本，并上传或替换自定义赛季。"
+                onClick={() => setDashboardPanel('season')}
+              />
+              <SettingsSectionItem
+                title="管理工具"
+                code="ADMIN_TOOLS"
+                description="集中处理作弊控制台、在线队伍操作、快照下载和回滚。"
+                onClick={() => setDashboardPanel('tools')}
+              />
+            </section>
+          ) : dashboardPanel === 'core' ? (
+          <DashboardDetail title="核心参数" code="CORE_V1.0" onBack={() => setDashboardPanel(null)}>
             <div style={{ display: 'grid', gap: '12px', paddingBottom: '18px', borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: '6px' }}>
               <div class="setting-info">
                 <h3>分阶段限时</h3>
@@ -1104,10 +1179,6 @@ export function App() {
                   </div>
                   <div class="switch-control-group">
                     <div class="switch-card">
-                      <span class="switch-copy">
-                        <span>{(settings?.turnTimeLimitSettings?.[enabledKey as keyof Settings['turnTimeLimitSettings']] as boolean) ? '已启用' : '已禁用'}</span>
-                        <span>{label}倒计时</span>
-                      </span>
                       <label class="switch">
                       <input
                         type="checkbox"
@@ -1145,10 +1216,6 @@ export function App() {
                 <p>所有玩家共用资源池</p>
               </div>
               <div class="switch-card compact">
-                <span class="switch-copy">
-                  <span>{settings?.isSharedPoolEnabled ? '共享中' : '已关闭'}</span>
-                  <span>资源池同步</span>
-                </span>
                 <label class="switch">
                   <input 
                   type="checkbox" 
@@ -1167,10 +1234,6 @@ export function App() {
                 <p>是否在大厅公开广播</p>
               </div>
               <div class="switch-card compact">
-                <span class="switch-copy">
-                  <span>{settings?.isRoomVisibleInLobby ? '公开中' : '隐藏中'}</span>
-                  <span>大厅广播</span>
-                </span>
                 <label class="switch">
                   <input 
                   type="checkbox" 
@@ -1189,10 +1252,6 @@ export function App() {
                 <p>放开队伍人数上限</p>
               </div>
               <div class="switch-card compact">
-                <span class="switch-copy">
-                  <span>{settings?.allowMoreThanFourPlayers ? '已放开' : '标准限制'}</span>
-                  <span>队伍人数上限</span>
-                </span>
                 <label class="switch">
                   <input
                   type="checkbox"
@@ -1211,10 +1270,6 @@ export function App() {
                 <p>选盟约时不向客户端广播别人的选择</p>
               </div>
               <div class="switch-card compact">
-                <span class="switch-copy">
-                  <span>{settings?.allowDuplicateStrategySelection ? '允许重复' : '禁止重复'}</span>
-                  <span>盟约选择广播</span>
-                </span>
                 <label class="switch">
                   <input
                   type="checkbox"
@@ -1237,12 +1292,9 @@ export function App() {
                 disabled={!!updating}
               />
             </div>
-          </aside>
-
-          {/* 列表区 */}
-          <div style={{ display: 'grid', gap: '30px' }}>
-            <section class="cyber-section">
-              <h2 class="section-title">授权战区地图 <span>MAP_AUTH</span></h2>
+          </DashboardDetail>
+          ) : dashboardPanel === 'maps' ? (
+          <DashboardDetail title="授权战区地图" code="MAP_AUTH" onBack={() => setDashboardPanel(null)}>
               <div class="maps-grid">
                 {MAPS.map(map => (
                   <div 
@@ -1255,10 +1307,9 @@ export function App() {
                   </div>
                 ))}
               </div>
-            </section>
-
-            <section class="cyber-section">
-              <h2 class="section-title">身份标识涂装 <span>ID_SKINS</span></h2>
+          </DashboardDetail>
+          ) : dashboardPanel === 'skins' ? (
+          <DashboardDetail title="身份标识涂装" code="ID_SKINS" onBack={() => setDashboardPanel(null)}>
               <div class="nc-grid">
                 {Object.entries(NAME_CARDS).map(([id, info]) => (
                   <div
@@ -1271,18 +1322,23 @@ export function App() {
                   </div>
                 ))}
               </div>
-            </section>
-
+          </DashboardDetail>
+          ) : dashboardPanel === 'season' ? (
+          <DashboardDetail title="赛季管理" code="SEASON_MGR" onBack={() => setDashboardPanel(null)}>
             <SeasonManager
               jwt={jwt}
               myUserId={userData?.user_id ?? ''}
               currentSeasonId={settings?.seasonId ?? 'act1autochess'}
               onSeasonChange={(id) => setSettings(s => s ? { ...s, seasonId: id } : s)}
             />
-
+          </DashboardDetail>
+          ) : (
+          <DashboardDetail title="管理工具" code="ADMIN_TOOLS" onBack={() => setDashboardPanel(null)}>
             <CheatConsole jwt={jwt} />
+            <div class="tool-divider" />
             <SnapshotRollback jwt={jwt} />
-          </div>
+          </DashboardDetail>
+          )}
         </div>
       ) : (
         <div class="container container-wide">
