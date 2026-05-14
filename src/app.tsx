@@ -673,7 +673,11 @@ function CheatConsole({ jwt }: { jwt: string }) {
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
   const [actionResult, setActionResult] = useState<Record<string, { ok: boolean; msg: string } | null>>({});
   const [kickLoading, setKickLoading] = useState<Record<string, boolean>>({});
+  const [snapshots, setSnapshots] = useState<Record<string, SnapshotMeta[]>>({});
+  const [rollbackLoading, setRollbackLoading] = useState<string | null>(null);
+  const [transferLoading, setTransferLoading] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const uploadInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const poll = async () => {
     try {
@@ -704,7 +708,10 @@ function CheatConsole({ jwt }: { jwt: string }) {
   const toggleExpand = (teamId: string) => {
     setExpanded(prev => {
       const next = { ...prev, [teamId]: !prev[teamId] };
-      if (next[teamId]) loadChessList(teamId);
+      if (next[teamId]) {
+        loadChessList(teamId);
+        loadSnapshots(teamId);
+      }
       return next;
     });
   };
@@ -741,6 +748,91 @@ function CheatConsole({ jwt }: { jwt: string }) {
     }
   };
 
+  const SCENE_STATE_LABELS: Record<string, string> = {
+    NONE: '未开始',
+    LOADING: '加载中',
+    SP_PREPARE: '特殊准备',
+    PREPARE: '准备阶段',
+    BATTLE: '战斗中',
+    HELP_BATTLE: '协防战斗',
+    BOSS_BATTLE: 'Boss 战',
+    SETTLE: '结算中',
+    END: '已结束',
+    BATTLE_WAITING: '等待开战',
+    BOSS_PREPARE_WAITING: 'Boss 战前等待',
+    PREPARE_RESTART: '准备阶段重开',
+    SP_PREPARE_RESTART: '特殊准备重开',
+    BOSS_BATTLE_RESTART: 'Boss 战重开',
+  };
+
+  const getSceneStateLabel = (sceneState: string | null | undefined) => (
+    sceneState ? (SCENE_STATE_LABELS[sceneState] || sceneState) : '未知状态'
+  );
+
+  const formatRelativeTime = (ts: number) => {
+    const diffMs = Date.now() - ts;
+    if (diffMs <= 0) return '0 秒前';
+    if (diffMs < 60 * 1000) return `${Math.floor(diffMs / 1000)} 秒前`;
+    if (diffMs < 60 * 60 * 1000) return `${Math.floor(diffMs / (60 * 1000))} 分钟前`;
+    if (diffMs < 24 * 60 * 60 * 1000) return `${Math.floor(diffMs / (60 * 60 * 1000))} 小时前`;
+    return `${Math.floor(diffMs / (24 * 60 * 60 * 1000))} 天前`;
+  };
+
+  const loadSnapshots = async (teamId: string) => {
+    try {
+      const data = await fetchSnapshots(jwt, teamId);
+      setSnapshots(prev => ({ ...prev, [teamId]: data }));
+    } catch (e: any) {
+      showResult(`${teamId}_snapshot`, false, e.message);
+    }
+  };
+
+  const doRollback = async (teamId: string, snapshotKey: string) => {
+    try {
+      setRollbackLoading(snapshotKey);
+      const res = await rollbackToSnapshot(jwt, teamId, snapshotKey);
+      showResult(`${teamId}_snapshot`, true, res.message);
+      await loadSnapshots(teamId);
+    } catch (e: any) {
+      showResult(`${teamId}_snapshot`, false, e.message);
+    } finally {
+      setRollbackLoading(null);
+    }
+  };
+
+  const doDownloadSnapshot = async (snapshot: SnapshotMeta) => {
+    try {
+      setTransferLoading(`download:${snapshot.key}`);
+      const blob = await downloadSnapshot(jwt, snapshot.key);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `snapshot-r${snapshot.round}-${snapshot.sceneState}-${snapshot.ts}.bin`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      showResult(`${snapshot.teamId}_snapshot`, true, '快照已下载');
+    } catch (e: any) {
+      showResult(`${snapshot.teamId}_snapshot`, false, e.message);
+    } finally {
+      setTransferLoading(null);
+    }
+  };
+
+  const doImportSnapshot = async (teamId: string, file: File) => {
+    try {
+      setTransferLoading(`import:${teamId}`);
+      const res = await importSnapshot(jwt, teamId, file);
+      showResult(`${teamId}_snapshot`, true, res.message);
+      await loadSnapshots(teamId);
+    } catch (e: any) {
+      showResult(`${teamId}_snapshot`, false, e.message);
+    } finally {
+      setTransferLoading(null);
+    }
+  };
+
   const ResultBadge = ({ k }: { k: string }) => {
     const r = actionResult[k];
     if (!r) return null;
@@ -752,15 +844,15 @@ function CheatConsole({ jwt }: { jwt: string }) {
   };
 
   return (
-    <>
-      <div style={{ fontSize: '0.7rem', opacity: 0.5, marginBottom: '12px' }}>
+    <div class="admin-tools">
+      <div class="admin-toolbar" style={{ fontSize: '0.7rem', opacity: 0.5, marginBottom: '12px' }}>
         轮询间隔 2s · 在线连接：{connections.length} 个
         {connections.some(conn => conn.isAdmin) && <span style={{ color: '#7ee7ff', marginLeft: '8px' }}>管理员视图 · 显示全部队伍</span>}
         {error && <span style={{ color: '#ff4d4d', marginLeft: '8px' }}>错误：{error}</span>}
       </div>
 
       {connections.length === 0 && !error && (
-        <div style={{ fontSize: '0.8rem', opacity: 0.4, textAlign: 'center', padding: '20px 0' }}>暂无在线连接</div>
+        <div class="admin-empty" style={{ fontSize: '0.8rem', opacity: 0.4, textAlign: 'center', padding: '20px 0' }}>暂无在线连接</div>
       )}
 
       {connections.map(conn => {
@@ -768,9 +860,9 @@ function CheatConsole({ jwt }: { jwt: string }) {
         const chess = chessListCache[conn.teamId];
 
         return (
-          <div key={conn.teamId} style={{ marginBottom: '16px', border: '1px solid rgba(255,77,77,0.2)', padding: '12px' }}>
+          <div key={conn.teamId} class="admin-team-card" style={{ marginBottom: '16px', border: '1px solid rgba(255,77,77,0.2)', padding: '12px' }}>
             {/* 连接头部 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginBottom: '8px' }}
+            <div class="admin-team-header" style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginBottom: '8px' }}
               onClick={() => toggleExpand(conn.teamId)}>
               <span style={{
                 display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%',
@@ -790,7 +882,8 @@ function CheatConsole({ jwt }: { jwt: string }) {
 
             {/* 玩家数据表 */}
             {conn.players.length > 0 && (
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.68rem', marginBottom: '8px' }}>
+              <div class="admin-table-wrap">
+              <table class="admin-player-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.68rem', marginBottom: '8px' }}>
                 <thead>
                   <tr style={{ opacity: 0.4 }}>
                     {['#', '昵称', 'HP', '金币', '回合', '棋子', '状态', '操作'].map(h => (
@@ -822,14 +915,15 @@ function CheatConsole({ jwt }: { jwt: string }) {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
 
         {/* 展开操作区 */}
             {isExpanded && (
-              <div style={{ borderTop: '1px solid rgba(255,77,77,0.2)', paddingTop: '10px', marginTop: '6px' }}>
+              <div class="admin-expanded" style={{ borderTop: '1px solid rgba(255,77,77,0.2)', paddingTop: '10px', marginTop: '6px' }}>
 
                 {/* 调整金币 */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px dashed var(--color-primary-dim)', flexWrap: 'wrap' }}>
+                <div class="admin-action-row" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px dashed var(--color-primary-dim)', flexWrap: 'wrap' }}>
                   <span style={{ fontSize: '0.7rem', opacity: 0.6, minWidth: '70px' }}>调整金币</span>
                   <input class="input-field" type="number" min="0" max="999"
                     style={{ width: '70px', padding: '3px 6px', fontSize: '0.75rem' }}
@@ -846,7 +940,7 @@ function CheatConsole({ jwt }: { jwt: string }) {
                 </div>
 
                 {/* 调整 HP */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px dashed var(--color-primary-dim)', flexWrap: 'wrap' }}>
+                <div class="admin-action-row" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px dashed var(--color-primary-dim)', flexWrap: 'wrap' }}>
                   <span style={{ fontSize: '0.7rem', opacity: 0.6, minWidth: '70px' }}>调整 HP</span>
                   <input class="input-field" type="number" min="0" max="9999"
                     style={{ width: '70px', padding: '3px 6px', fontSize: '0.75rem' }}
@@ -863,7 +957,7 @@ function CheatConsole({ jwt }: { jwt: string }) {
                 </div>
 
                 {/* 调整回合（整个 team） */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px dashed var(--color-primary-dim)', flexWrap: 'wrap' }}>
+                <div class="admin-action-row" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px dashed var(--color-primary-dim)', flexWrap: 'wrap' }}>
                   <span style={{ fontSize: '0.7rem', opacity: 0.6, minWidth: '70px' }}>调整回合</span>
                   <input class="input-field" type="number" min="1" max="15"
                     style={{ width: '60px', padding: '3px 6px', fontSize: '0.75rem' }}
@@ -881,7 +975,7 @@ function CheatConsole({ jwt }: { jwt: string }) {
                 </div>
 
                 {/* 调整盟约叠层 */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px dashed var(--color-primary-dim)', flexWrap: 'wrap' }}>
+                <div class="admin-action-row" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px dashed var(--color-primary-dim)', flexWrap: 'wrap' }}>
                   <span style={{ fontSize: '0.7rem', opacity: 0.6, minWidth: '70px' }}>盟约叠层</span>
                   <select class="select-field"
                     style={{ flex: 1, padding: '3px 6px', fontSize: '0.7rem', minWidth: '120px' }}
@@ -909,7 +1003,7 @@ function CheatConsole({ jwt }: { jwt: string }) {
                 </div>
 
                 {/* 添加棋子 */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px dashed var(--color-primary-dim)', flexWrap: 'wrap' }}>
+                <div class="admin-action-row" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px dashed var(--color-primary-dim)', flexWrap: 'wrap' }}>
                   <span style={{ fontSize: '0.7rem', opacity: 0.6, minWidth: '70px' }}>添加棋子</span>
                   <select class="select-field"
                     style={{ flex: 1, padding: '3px 6px', fontSize: '0.7rem', minWidth: '140px' }}
@@ -931,7 +1025,7 @@ function CheatConsole({ jwt }: { jwt: string }) {
                 </div>
 
                 {/* 危险操作区 */}
-                <div style={{ marginTop: '10px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                <div class="admin-danger-row" style={{ marginTop: '10px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                   <button
                     class="input-field"
                     style={{ cursor: 'pointer', padding: '4px 12px', fontSize: '0.7rem', color: '#ffaa00', border: '1px solid #ffaa00', opacity: actionLoading[`${conn.teamId}_forceend`] ? 0.5 : 1 }}
@@ -960,18 +1054,82 @@ function CheatConsole({ jwt }: { jwt: string }) {
                   <ResultBadge k={`${conn.teamId}_forcelogin`} />
                   <ResultBadge k={`${conn.teamId}_dissolve`} />
                 </div>
+                <div class="admin-snapshot-panel">
+                  <div class="admin-snapshot-head">
+                    <div>
+                      <strong>Snapshot</strong>
+                      <span>{(snapshots[conn.teamId] || []).length} 条可用快照</span>
+                    </div>
+                    <div class="admin-snapshot-actions">
+                      <button class="input-field" type="button" onClick={() => loadSnapshots(conn.teamId)}>刷新</button>
+                      <button
+                        class="input-field"
+                        type="button"
+                        disabled={transferLoading === `import:${conn.teamId}`}
+                        onClick={() => uploadInputRefs.current[conn.teamId]?.click()}
+                      >
+                        {transferLoading === `import:${conn.teamId}` ? '上传中...' : '上传快照'}
+                      </button>
+                      <input
+                        ref={(el) => { uploadInputRefs.current[conn.teamId] = el; }}
+                        type="file"
+                        accept=".bin,application/octet-stream"
+                        style={{ display: 'none' }}
+                        onChange={(e) => {
+                          const file = (e.currentTarget as HTMLInputElement).files?.[0];
+                          if (file) doImportSnapshot(conn.teamId, file);
+                          (e.currentTarget as HTMLInputElement).value = '';
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <ResultBadge k={`${conn.teamId}_snapshot`} />
+                  <div class="admin-snapshot-list">
+                    {(snapshots[conn.teamId] || []).slice().sort((a, b) => b.ts - a.ts).length === 0 ? (
+                      <div class="admin-snapshot-empty">无可用快照</div>
+                    ) : (
+                      (snapshots[conn.teamId] || []).slice().sort((a, b) => b.ts - a.ts).map(s => (
+                        <div class="admin-snapshot-item" key={s.key}>
+                          <div class="admin-snapshot-meta">
+                            <strong>R{s.round} · {getSceneStateLabel(s.sceneState)}</strong>
+                            <span>{formatRelativeTime(s.ts)}</span>
+                            <code>{s.key}</code>
+                          </div>
+                          <div class="admin-snapshot-actions">
+                            <button
+                              class="input-field"
+                              type="button"
+                              disabled={transferLoading === `download:${s.key}`}
+                              onClick={() => doDownloadSnapshot(s)}
+                            >
+                              {transferLoading === `download:${s.key}` ? '下载中...' : '下载'}
+                            </button>
+                            <button
+                              class="input-field"
+                              type="button"
+                              disabled={rollbackLoading === s.key}
+                              onClick={() => doRollback(conn.teamId, s.key)}
+                            >
+                              {rollbackLoading === s.key ? '回滚中...' : '回滚'}
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
               </div>
             )}
           </div>
         );
       })}
-    </>
+    </div>
   );
 }
 
 // ─── 快照回滚组件 ─────────────────────────────────────────────────────────
 
-function SnapshotRollback({ jwt }: { jwt: string }) {
+export function SnapshotRollback({ jwt }: { jwt: string }) {
   const [teams, setTeams] = useState<TeamInfo[]>([]);
   const [snapshots, setSnapshots] = useState<Record<string, SnapshotMeta[]>>({});
   const [expandedTeam, setExpandedTeam] = useState<string | null>(null);
@@ -1262,7 +1420,7 @@ function SnapshotRollback({ jwt }: { jwt: string }) {
 
 export function App() {
   const [jwt, setJwt] = useState<string>(localStorage.getItem('auth_token') || '');
-  const [theme, setTheme] = useState<'mono' | 'pink'>((localStorage.getItem('ui_theme') as 'mono' | 'pink') || 'mono');
+  const [theme, setTheme] = useState<'mono' | 'pink'>((localStorage.getItem('ui_theme') as 'mono' | 'pink') || 'pink');
   const [panelIcons] = useState(() => shuffleOrangeAssets().slice(0, 6));
   const [fallingStickers] = useState(() => createFallingStickers(16));
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -1687,8 +1845,6 @@ export function App() {
           ) : (
           <DashboardDetail title="管理工具" code="ADMIN_TOOLS" onBack={() => setDashboardPanel(null)}>
             <CheatConsole jwt={jwt} />
-            <div class="tool-divider" />
-            <SnapshotRollback jwt={jwt} />
           </DashboardDetail>
           )}
         </div>

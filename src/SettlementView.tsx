@@ -14,21 +14,21 @@ import {
 import { CHARACTER_NAME_MAP } from './constants';
 
 const PLAYER_SHADES = [
-  '#f5f7fa', '#cfd4dc', '#aeb5c0', '#8f96a1', '#6f7782',
-  '#ffffff', '#d9dde4', '#b9c0ca', '#969da8', '#767e89',
-  '#e9eef5', '#c4cad4', '#a1a9b4', '#858d99', '#656d78',
+  '#5b8def', '#e05f86', '#58a65c', '#d39434', '#8367c7',
+  '#2f9aa0', '#c8573f', '#7c8a35', '#b45aa4', '#4e7f96',
+  '#a56f3b', '#6c77d7', '#d66a7d', '#4d9b74', '#9c6dcc',
 ];
 function playerColor(i: number) { return PLAYER_SHADES[i % PLAYER_SHADES.length]; }
 
 const LINE_COLORS = [
-  '#f5f7fa', '#b8c1cf', '#7ee7ff', '#a7b0bd', '#d7dce5', '#ff80ab', '#ffab40', '#9aa3af',
-  '#ffd740', '#40c4ff', '#ea80fc', '#ff8a80', '#c5cad3', '#ff6e40', '#84ffff', '#ff4081',
+  '#5b8def', '#e05f86', '#58a65c', '#d39434', '#8367c7', '#2f9aa0', '#c8573f', '#7c8a35',
+  '#b45aa4', '#4e7f96', '#a56f3b', '#6c77d7', '#d66a7d', '#4d9b74', '#9c6dcc', '#b17624',
 ];
 
-const BG = '#050607';
-const FG = '#f5f7fa';
-const FG_DIM = 'rgba(255,255,255,0.22)';
-const FG_GRID = 'rgba(255,255,255,0.07)';
+const BG = 'var(--color-bg)';
+const FG = 'var(--color-primary)';
+const FG_DIM = 'var(--color-primary-mid)';
+const FG_GRID = 'var(--chart-grid)';
 const ttStyles = { ...defaultStyles, background: BG, border: `1px solid ${FG}`, borderRadius: 10, color: FG, fontSize: '0.7rem', fontFamily: "'PingFang SC','Microsoft YaHei',sans-serif" };
 const axisLabel = { fill: FG, fontSize: '0.6rem' as const, fontFamily: "'PingFang SC','Microsoft YaHei',sans-serif" as const };
 const axisLabelLeft = { ...axisLabel, textAnchor: 'end' as const, dy: '0.3em' as const, dx: -4 };
