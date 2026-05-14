@@ -104,12 +104,16 @@ body[data-theme="pink"] .top-header {
 }
 
 .title-mascot {
-  display: inline-block;
+  display: none;
   width: 42px;
   height: 42px;
   object-fit: contain;
   border-radius: 10px;
   filter: drop-shadow(0 8px 14px rgba(177, 74, 119, 0.18));
+}
+
+body[data-theme="pink"] .title-mascot {
+  display: inline-block;
 }
 
 .user-info {
@@ -276,13 +280,17 @@ body[data-theme="pink"] .orange-sticker-motion {
 }
 
 .settings-section-avatar {
-  display: block;
+  display: none;
   width: 54px;
   height: 54px;
   flex: 0 0 54px;
   object-fit: contain;
   border-radius: 12px;
   filter: drop-shadow(0 9px 16px rgba(177, 74, 119, 0.18));
+}
+
+body[data-theme="pink"] .settings-section-avatar {
+  display: block;
 }
 
 .settings-section-item:last-child {
