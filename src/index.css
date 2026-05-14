@@ -921,7 +921,35 @@ body[data-theme="pink"] .select-field {
   animation: spin 1s infinite linear;
   border-radius: 50%;
 }
+
+.loading-meme {
+  display: none;
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  border-radius: 18px;
+  filter: drop-shadow(0 18px 28px rgba(177, 74, 119, 0.22));
+  animation: loadingMemeFloat 1.2s ease-in-out infinite alternate;
+}
+
+body[data-theme="pink"] .loading-screen .spinner {
+  display: none;
+}
+
+body[data-theme="pink"] .loading-meme {
+  display: block;
+}
+
 @keyframes spin { to { transform: rotate(360deg); } }
+
+@keyframes loadingMemeFloat {
+  from {
+    transform: translateY(0) rotate(-3deg) scale(0.98);
+  }
+  to {
+    transform: translateY(-8px) rotate(3deg) scale(1.02);
+  }
+}
 
 /* Selector Component Styles */
 .selector-container {

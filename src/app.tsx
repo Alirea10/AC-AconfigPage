@@ -1576,6 +1576,7 @@ export function App() {
     return (
       <div class="loading-screen">
         <div class="spinner"></div>
+        <img class="loading-meme" src={orangeMemeSrc(panelIcons[0])} alt="" />
         <div style={{ letterSpacing: '4px', fontSize: '0.8rem', marginTop: '20px' }}>PRTS_SYNCING...</div>
       </div>
     );
