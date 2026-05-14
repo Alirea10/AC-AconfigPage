@@ -121,7 +121,7 @@ export interface BondItem {
   identifier: number;
 }
 
-export type CheatAction = 'SET_COIN' | 'SET_HP' | 'SET_ROUND' | 'SET_BOND_STACK' | 'ADD_CHESS' | 'FORCE_LOGIN' | 'DISSOLVE_TEAM';
+export type CheatAction = 'SET_COIN' | 'SET_HP' | 'SET_ROUND' | 'SET_BOND_STACK' | 'ADD_CHESS' | 'FORCE_END_PHASE' | 'FORCE_LOGIN' | 'DISSOLVE_TEAM';
 
 /** 获取所有在线连接及其战斗状态 */
 export const fetchCheatStatus = async (jwt: string): Promise<CheatConnection[]> => {

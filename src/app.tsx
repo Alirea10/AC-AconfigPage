@@ -557,6 +557,14 @@ function CheatConsole({ jwt }: { jwt: string }) {
                 <div style={{ marginTop: '10px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                   <button
                     class="input-field"
+                    style={{ cursor: 'pointer', padding: '4px 12px', fontSize: '0.7rem', color: '#ffaa00', border: '1px solid #ffaa00', opacity: actionLoading[`${conn.teamId}_forceend`] ? 0.5 : 1 }}
+                    disabled={actionLoading[`${conn.teamId}_forceend`]}
+                    onClick={() => doAction(conn.teamId, 'forceend', 'FORCE_END_PHASE')}
+                  >
+                    {actionLoading[`${conn.teamId}_forceend`] ? '执行中...' : '强制结束当前阶段'}
+                  </button>
+                  <button
+                    class="input-field"
                     style={{ cursor: 'pointer', padding: '4px 12px', fontSize: '0.7rem', color: '#ff4d4d', border: '1px solid #ff4d4d', opacity: actionLoading[`${conn.teamId}_forcelogin`] ? 0.5 : 1 }}
                     disabled={actionLoading[`${conn.teamId}_forcelogin`]}
                     onClick={() => doAction(conn.teamId, 'forcelogin', 'FORCE_LOGIN')}
@@ -571,6 +579,7 @@ function CheatConsole({ jwt }: { jwt: string }) {
                   >
                     {actionLoading[`${conn.teamId}_dissolve`] ? '执行中...' : '⚠ 强制解散队伍'}
                   </button>
+                  <ResultBadge k={`${conn.teamId}_forceend`} />
                   <ResultBadge k={`${conn.teamId}_forcelogin`} />
                   <ResultBadge k={`${conn.teamId}_dissolve`} />
                 </div>
