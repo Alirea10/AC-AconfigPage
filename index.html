@@ -2,7 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link id="favicon" rel="icon" type="image/webp" href="/orange/4.webp" />
+    <script>
+      (() => {
+        const assets = ['4', '6', '7', '10', '15', '18', '19', '20', '25', '28', '33', '36'];
+        const icon = assets[Math.floor(Math.random() * assets.length)];
+        document.getElementById('favicon')?.setAttribute('href', `/orange/${icon}.webp`);
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>autochess-config-page</title>
   </head>

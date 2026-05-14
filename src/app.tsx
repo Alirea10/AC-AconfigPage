@@ -24,6 +24,10 @@ function shuffleOrangeAssets() {
   return items;
 }
 
+function orangeMemeSrc(name: string) {
+  return `/orange/${name}.webp`;
+}
+
 function createFallingStickers(count: number) {
   const shuffled = shuffleOrangeAssets();
   return Array.from({ length: count }, (_, i) => {
@@ -1585,7 +1589,7 @@ export function App() {
 
       <header class="top-header">
         <h1>
-          <img class="title-mascot" src={`/orange/${panelIcons[5]}.webp`} alt="" />
+          <img class="title-mascot" src={orangeMemeSrc(panelIcons[5])} alt="" />
           明日方舟·橘戍协议
           <span style={{ fontSize: '0.5rem', opacity: '0.5', fontWeight: '400', marginTop: '2px', display: 'block' }}>TERMINAL_INTERFACE // v2.0.4</span>
         </h1>
@@ -1637,35 +1641,35 @@ export function App() {
                 title="核心参数"
                 code="CORE_V1.0"
                 description="配置回合限时、共享池、公开权限、人数上限、重复盟约和助理干员。"
-                iconSrc={`/orange/${panelIcons[0]}.webp`}
+                iconSrc={orangeMemeSrc(panelIcons[0])}
                 onClick={() => setDashboardPanel('core')}
               />
               <SettingsSectionItem
                 title="授权战区地图"
                 code="MAP_AUTH"
                 description="选择当前房间允许出现的地图池。"
-                iconSrc={`/orange/${panelIcons[1]}.webp`}
+                iconSrc={orangeMemeSrc(panelIcons[1])}
                 onClick={() => setDashboardPanel('maps')}
               />
               <SettingsSectionItem
                 title="身份标识涂装"
                 code="ID_SKINS"
                 description="切换房间使用的身份牌和展示外观。"
-                iconSrc={`/orange/${panelIcons[2]}.webp`}
+                iconSrc={orangeMemeSrc(panelIcons[2])}
                 onClick={() => setDashboardPanel('skins')}
               />
               <SettingsSectionItem
                 title="赛季管理"
                 code="SEASON_MGR"
                 description="查看内置赛季、启用赛季版本，并上传或替换自定义赛季。"
-                iconSrc={`/orange/${panelIcons[3]}.webp`}
+                iconSrc={orangeMemeSrc(panelIcons[3])}
                 onClick={() => setDashboardPanel('season')}
               />
               <SettingsSectionItem
                 title="管理工具"
                 code="ADMIN_TOOLS"
                 description="集中处理作弊控制台、在线队伍操作、快照下载和回滚。"
-                iconSrc={`/orange/${panelIcons[4]}.webp`}
+                iconSrc={orangeMemeSrc(panelIcons[4])}
                 onClick={() => setDashboardPanel('tools')}
               />
             </section>
