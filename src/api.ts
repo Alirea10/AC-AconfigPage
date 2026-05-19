@@ -36,7 +36,7 @@ export interface SeasonMeta {
   isBuiltin: boolean;
 }
 
-const BASE_URL = '/api';
+const BASE_URL = import.meta.env.PROD ? '' : '/api';
 
 export const fetchSettings = async (jwt: string): Promise<Settings> => {
   const response = await fetch(`${BASE_URL}/user/settings?jwt=${jwt}`);
