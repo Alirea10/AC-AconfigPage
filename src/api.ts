@@ -134,6 +134,25 @@ export const fetchCheatStatus = async (jwt: string): Promise<CheatConnection[]> 
   return data.connections;
 };
 
+export const subscribeCheatStatus = (
+  jwt: string,
+  onStatus: (connections: CheatConnection[]) => void,
+  onError: (message: string) => void,
+): EventSource => {
+  const source = new EventSource(`${BASE_URL}/cheat/status/stream?jwt=${jwt}`);
+  source.addEventListener('status', (event) => {
+    const data = JSON.parse((event as MessageEvent<string>).data) as { connections: CheatConnection[] };
+    onStatus(data.connections);
+  });
+  source.onerror = () => {
+    onError('Cheat status stream disconnected, reconnecting...');
+  };
+  source.onopen = () => {
+    onError('');
+  };
+  return source;
+};
+
 /** 获取指定 team 的赛季棋子和盟约列表 */
 export const fetchChessList = async (jwt: string, teamId: string): Promise<{ chars: ChessItem[]; traps: ChessItem[]; bonds: BondItem[] }> => {
   const response = await fetch(`${BASE_URL}/cheat/chess-list?jwt=${jwt}&teamId=${encodeURIComponent(teamId)}`);

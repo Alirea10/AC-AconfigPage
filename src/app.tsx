@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { ArrowLeft20Regular, ChevronRight20Regular, Heart20Regular, WeatherSunny20Regular } from '@fluentui/react-icons';
-import { type Settings, type SeasonMeta, fetchSettings, updateSetting, fetchSeasons, uploadSeason, deleteSeason, fetchCheatStatus, fetchChessList, executeCheatAction, kickPlayer, type CheatConnection, type ChessItem, type BondItem, fetchTeams, fetchSnapshots, rollbackToSnapshot, downloadSnapshot, importSnapshot, type TeamInfo, type SnapshotMeta } from './api';
+import { type Settings, type SeasonMeta, fetchSettings, updateSetting, fetchSeasons, uploadSeason, deleteSeason, fetchCheatStatus, subscribeCheatStatus, fetchChessList, executeCheatAction, kickPlayer, type CheatConnection, type ChessItem, type BondItem, fetchTeams, fetchSnapshots, rollbackToSnapshot, downloadSnapshot, importSnapshot, type TeamInfo, type SnapshotMeta } from './api';
 import { CHARACTER_NAME_MAP, MAPS, NAME_CARDS } from './constants';
 import { SecretarySelector } from './SecretarySelector';
 import { SettlementView } from './SettlementView';
@@ -717,7 +717,6 @@ function CheatConsole({ jwt }: { jwt: string }) {
   const [snapshots, setSnapshots] = useState<Record<string, SnapshotMeta[]>>({});
   const [rollbackLoading, setRollbackLoading] = useState<string | null>(null);
   const [transferLoading, setTransferLoading] = useState<string | null>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
 
   const selectedConn = connections.find(conn => conn.teamId === selectedTeamId) ?? connections[0] ?? null;
@@ -770,8 +769,16 @@ function CheatConsole({ jwt }: { jwt: string }) {
 
   useEffect(() => {
     poll();
-    timerRef.current = setInterval(poll, 2000);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    const source = subscribeCheatStatus(
+      jwt,
+      (data) => {
+        setConnections(data);
+        setSelectedTeamId(prev => prev && data.some(conn => conn.teamId === prev) ? prev : (data[0]?.teamId ?? null));
+        setError(null);
+      },
+      (message) => setError(message || null),
+    );
+    return () => source.close();
   }, [jwt]);
 
   useEffect(() => {
@@ -1078,7 +1085,6 @@ function LegacyCheatConsole({ jwt }: { jwt: string }) {
   const [snapshots, setSnapshots] = useState<Record<string, SnapshotMeta[]>>({});
   const [rollbackLoading, setRollbackLoading] = useState<string | null>(null);
   const [transferLoading, setTransferLoading] = useState<string | null>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const uploadInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const poll = async () => {
@@ -1093,8 +1099,15 @@ function LegacyCheatConsole({ jwt }: { jwt: string }) {
 
   useEffect(() => {
     poll();
-    timerRef.current = setInterval(poll, 2000);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    const source = subscribeCheatStatus(
+      jwt,
+      (data) => {
+        setConnections(data);
+        setError(null);
+      },
+      (message) => setError(message || null),
+    );
+    return () => source.close();
   }, [jwt]);
 
   const loadChessList = async (teamId: string) => {
