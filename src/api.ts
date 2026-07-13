@@ -36,7 +36,7 @@ export interface SeasonMeta {
   isBuiltin: boolean;
 }
 
-const BASE_URL = import.meta.env.PROD ? '' : '/api';
+const BASE_URL = '/api';
 
 export const fetchSettings = async (jwt: string): Promise<Settings> => {
   const response = await fetch(`${BASE_URL}/user/settings?jwt=${jwt}`);
@@ -108,6 +108,16 @@ export interface CheatConnection {
   round: number | null;
   isAdmin: boolean;
   players: CheatPlayer[];
+  /** 后端尚未接入时缺失；接入后通过 status 查询和 SSE 实时返回。 */
+  banStatus?: BanStatus;
+}
+
+export interface BanStatus {
+  bannedBondIds: string[];
+  bannedCharacters: Array<{
+    chessId: string;
+    reasonBondIds: string[];
+  }>;
 }
 
 export interface ChessItem {

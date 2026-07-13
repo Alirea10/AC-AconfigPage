@@ -1,25 +1,617 @@
-#app {
-  max-width: 1280px;
+/* ─── Multi-account and JWT workspace ───────────────────────────────────── */
+
+.auth-workspace-container {
+  align-items: flex-start;
+  overflow-y: auto;
+  padding: 42px 20px;
+}
+.auth-workspace {
+  width: min(1180px, 100%);
   margin: 0 auto;
-  padding: 2rem;
+}
+
+.auth-error-banner,
+.account-global-error {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 77, 77, 0.55);
+  background: rgba(255, 77, 77, 0.1);
+  color: #ff8c8c;
+  font-size: 0.76rem;
+}
+
+.header-account-switch {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) auto auto;
+  gap: 4px 6px;
+  align-items: center;
+  min-width: 330px;
+}
+
+.header-account-switch > span {
+  grid-column: 1 / -1;
+  font-size: 0.55rem;
+  letter-spacing: 0.14em;
+  opacity: 0.55;
+}
+
+.header-account-switch select,
+.header-account-switch button {
+  min-height: 32px;
+  border: 1px solid var(--color-primary-dim);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--color-primary);
+  font: inherit;
+  font-size: 0.68rem;
+}
+
+.header-account-switch button.new-token {
+  border-color: var(--color-primary);
+  background: var(--color-primary-dim);
+  color: var(--color-primary);
+}
+
+.account-heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.header-account-switch button {
+  cursor: pointer;
+  padding: 0 9px;
+}
+
+.header-account-error {
+  position: absolute;
+  right: 20px;
+  top: calc(100% + 6px);
+  z-index: 20;
+  max-width: min(520px, calc(100vw - 40px));
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 77, 77, 0.55);
+  background: rgba(35, 5, 8, 0.96);
+  color: #ff8c8c;
+  font-size: 0.68rem;
+}
+
+.account-center {
+  display: grid;
+  gap: 14px;
+}
+
+.account-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 10px;
+}
+
+.account-tabs button,
+.account-list-heading button,
+.account-actions button,
+.account-empty button,
+.account-upload > button,
+.account-upload-form button,
+.jwt-toolbar button,
+.jwt-secondary-btn,
+.jwt-field-title button,
+.jwt-secret-row button {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--color-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.7rem;
+  padding: 7px 11px;
+}
+
+.account-tabs button.active,
+.account-actions button.primary,
+.account-heading-actions button.primary,
+.account-upload-form button.primary,
+.jwt-toolbar button.primary {
+  border-color: var(--color-primary);
+  background: var(--color-primary-dim);
+  color: var(--color-primary);
+}
+
+.account-tabs button span {
+  margin-left: 5px;
+  opacity: 0.55;
+}
+
+.account-list-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.account-list-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.account-list-heading h3,
+.jwt-tool-heading h3 {
+  margin: 0 0 5px;
+  font-size: 1rem;
+}
+
+.account-list-heading p,
+.jwt-tool-heading p {
+  margin: 0;
+  max-width: 760px;
+  opacity: 0.56;
+  font-size: 0.72rem;
+  line-height: 1.6;
+}
+
+.account-empty {
+  display: grid;
+  place-items: center;
+  gap: 12px;
+  min-height: 180px;
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+  opacity: 0.8;
+}
+
+.account-list {
+  display: grid;
+  gap: 10px;
+}
+
+.account-card {
+  display: grid;
+  grid-template-columns: minmax(250px, 1.3fr) minmax(220px, 1fr);
+  gap: 12px 18px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.account-card.active {
+  border-color: var(--color-primary);
+  box-shadow: inset 3px 0 0 var(--color-primary);
+}
+
+.account-card-main,
+.account-identity,
+.account-meta,
+.account-season-summary,
+.account-actions {
+  display: flex;
+}
+
+.account-card-main {
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.account-identity {
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.account-avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary-dim);
+  color: var(--color-primary);
+  font-weight: 800;
+}
+
+.account-identity h4 {
+  margin: 0 0 4px;
+  font-size: 0.84rem;
+}
+
+.account-identity h4 span {
+  margin-left: 5px;
+  color: var(--color-primary);
+  font-size: 0.62rem;
+}
+
+.account-identity code {
+  display: block;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.65rem;
+  opacity: 0.55;
+}
+
+.account-meta,
+.account-season-summary {
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.66rem;
+}
+
+.account-meta {
+  text-align: right;
+  opacity: 0.72;
+}
+
+.account-meta .ok,
+.account-row-message.ok {
+  color: #66d996;
+}
+
+.account-meta .bad,
+.account-row-message.bad {
+  color: #ff7777;
+}
+
+.account-season-summary {
+  justify-content: center;
+  padding-left: 12px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.account-season-summary .muted {
+  opacity: 0.45;
+}
+
+.account-actions {
+  grid-column: 1 / -1;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.account-actions button.danger {
+  color: #ff7777;
+  border-color: rgba(255, 77, 77, 0.42);
+}
+
+.account-upload {
+  display: contents;
+}
+
+.account-upload-form {
+  flex: 1 1 100%;
+  display: grid;
+  grid-template-columns: minmax(280px, 2fr) minmax(160px, 0.75fr) auto;
+  gap: 7px;
+  align-items: center;
+  padding-top: 6px;
+}
+
+.account-upload-name,
+.account-upload-file {
+  min-width: 0;
+}
+
+.account-upload-file {
+  width: 100%;
+  font-size: 0.64rem;
+}
+
+.account-row-message {
+  grid-column: 1 / -1;
+  font-size: 0.68rem;
+}
+
+.jwt-tool {
+  display: grid;
+  gap: 14px;
+}
+
+.jwt-tool-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.jwt-kicker {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--color-primary);
+  font-size: 0.56rem;
+  letter-spacing: 0.15em;
+}
+
+.jwt-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.jwt-field > span,
+.jwt-field-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.jwt-field-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.jwt-field-title code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.55;
+  font-size: 0.62rem;
+}
+
+.jwt-token-input {
+  min-height: 112px;
+  resize: vertical;
+  word-break: break-all;
+  font-family: Consolas, monospace;
+  font-size: 0.7rem;
+  line-height: 1.55;
+}
+
+.jwt-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.jwt-toolbar button:disabled,
+.account-actions button:disabled,
+.account-upload-form button:disabled {
+  cursor: wait;
+  opacity: 0.45;
+}
+
+.jwt-sections {
+  display: grid;
+  grid-template-columns: minmax(230px, 0.8fr) minmax(300px, 1fr) minmax(260px, 0.9fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.jwt-json-input {
+  min-height: 330px;
+  resize: vertical;
+  font-family: Consolas, monospace;
+  font-size: 0.72rem;
+  line-height: 1.55;
+  white-space: pre;
+}
+
+.jwt-signature-panel {
+  display: grid;
+  align-content: start;
+  gap: 13px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.jwt-field.compact > span {
+  font-size: 0.62rem;
+  opacity: 0.62;
+}
+
+.jwt-secret-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+}
+
+.jwt-message {
+  padding: 9px 11px;
+  border: 1px solid currentColor;
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+
+.jwt-message.ok {
+  color: #66d996;
+  background: rgba(50, 180, 100, 0.08);
+}
+
+.jwt-message.bad {
+  color: #ff7777;
+  background: rgba(255, 77, 77, 0.08);
+}
+
+/* ─── Match ban status reservation ──────────────────────────────────────── */
+
+.ban-status-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(255, 95, 95, 0.22);
+  background: linear-gradient(120deg, rgba(120, 15, 20, 0.08), rgba(255, 255, 255, 0.015));
+}
+
+.ban-status-heading,
+.ban-status-placeholder,
+.ban-character-card,
+.ban-bond-summary {
+  display: flex;
+}
+
+.ban-status-heading {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ban-status-heading span {
+  display: block;
+  color: #ff7777;
+  font-size: 0.54rem;
+  letter-spacing: 0.16em;
+}
+
+.ban-status-heading h4 {
+  margin: 4px 0 0;
+  font-size: 0.88rem;
+}
+
+.ban-status-heading > strong {
+  color: #ff7777;
+  font-size: 0.76rem;
+}
+
+.ban-status-placeholder {
+  align-items: center;
+  gap: 12px;
+  min-height: 72px;
+  padding: 10px;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+}
+
+.ban-placeholder-icon {
+  font-size: 2rem;
+  color: #ff7777;
+  opacity: 0.55;
+}
+
+.ban-status-placeholder strong,
+.ban-status-placeholder p {
+  font-size: 0.7rem;
+}
+
+.ban-status-placeholder p {
+  margin: 5px 0 0;
+  opacity: 0.5;
+  line-height: 1.5;
+}
+
+.ban-status-empty {
+  padding: 18px;
   text-align: center;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  opacity: 0.55;
+  font-size: 0.72rem;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.preact:hover {
-  filter: drop-shadow(0 0 2em #673ab8aa);
+.ban-character-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 8px;
 }
 
-.card {
-  padding: 2em;
+.ban-character-card {
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid rgba(255, 95, 95, 0.24);
+  background: rgba(20, 5, 7, 0.35);
 }
 
-.read-the-docs {
-  color: #888;
+.ban-character-mark {
+  display: grid;
+  place-items: center;
+  flex: 0 0 42px;
+  height: 42px;
+  border: 1px solid #ff5f5f;
+  color: #ff7777;
+  font-size: 0.62rem;
+  font-weight: 900;
+  transform: rotate(-4deg);
+}
+
+.ban-character-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.ban-character-copy strong {
+  font-size: 0.76rem;
+}
+
+.ban-character-copy code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.6rem;
+  opacity: 0.5;
+}
+
+.ban-reason-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.ban-reason-list span,
+.ban-bond-summary code {
+  padding: 2px 5px;
+  border: 1px solid rgba(255, 95, 95, 0.3);
+  color: #ff9999;
+  font-size: 0.58rem;
+}
+
+.ban-bond-summary {
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 0.62rem;
+}
+
+.ban-bond-summary > span {
+  margin-right: 4px;
+  opacity: 0.52;
+}
+
+@media (max-width: 1050px) {
+  .jwt-sections {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .jwt-signature-panel {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  .auth-workspace-container {
+    padding: 18px 8px;
+  }
+
+  .header-account-switch {
+    width: 100%;
+  }
+
+  .account-card,
+  .jwt-sections,
+  .account-upload-form {
+    grid-template-columns: 1fr;
+  }
+
+  .account-card-main,
+  .account-list-heading,
+  .jwt-tool-heading {
+    flex-direction: column;
+  }
+
+  .account-meta {
+    text-align: left;
+  }
+
+  .account-season-summary {
+    padding: 10px 0 0;
+    border-left: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .jwt-signature-panel,
+  .account-upload-form {
+    grid-column: auto;
+  }
+
+  .jwt-json-input {
+    min-height: 250px;
+  }
 }

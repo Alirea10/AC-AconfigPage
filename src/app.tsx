@@ -1,17 +1,22 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { ArrowLeft20Regular, ChevronRight20Regular, Heart20Regular, WeatherSunny20Regular } from '@fluentui/react-icons';
+import './app.css';
 import { type Settings, type SeasonMeta, fetchSettings, updateSetting, fetchSeasons, uploadSeason, deleteSeason, fetchCheatStatus, subscribeCheatStatus, fetchChessList, executeCheatAction, kickPlayer, type CheatConnection, type ChessItem, type BondItem, fetchTeams, fetchSnapshots, rollbackToSnapshot, downloadSnapshot, importSnapshot, type TeamInfo, type SnapshotMeta } from './api';
 import { CHARACTER_NAME_MAP, MAPS, NAME_CARDS } from './constants';
 import { SecretarySelector } from './SecretarySelector';
 import { SettlementView } from './SettlementView';
-
-interface JwtPayload {
-  appid: string;
-  user_id: string;
-  nickname: string;
-  iat: number;
-  exp: number;
-}
+import { AccountCenter } from './AccountCenter';
+import { BanStatusPanel } from './BanStatusPanel';
+import {
+  type AuthProfileState,
+  type JwtPayload,
+  decodeJwt,
+  loadAuthProfileState,
+  profileFromToken,
+  removeAuthProfile,
+  saveAuthProfileState,
+  upsertAuthProfile,
+} from './auth';
 
 const ORANGE_ASSETS = ['4', '6', '7', '10', '15', '18', '19', '20', '25', '28', '33', '36'];
 
@@ -906,6 +911,8 @@ function CheatConsole({ jwt }: { jwt: string }) {
           </div>
         )}
       </div>
+
+      <BanStatusPanel banStatus={selectedConn.banStatus} chessList={chess} />
 
       <div class="admin-player-strip">
         {selectedConn.players.map(player => (
@@ -1836,62 +1843,118 @@ export function SnapshotRollback({ jwt }: { jwt: string }) {
 }
 
 export function App() {
-  const [jwt, setJwt] = useState<string>(localStorage.getItem('auth_token') || '');
+  const [authState, setAuthState] = useState<AuthProfileState>(() => loadAuthProfileState(localStorage));
   const [theme, setTheme] = useState<'mono' | 'pink'>((localStorage.getItem('ui_theme') as 'mono' | 'pink') || 'pink');
-  const [panelIcons] = useState(() => shuffleOrangeAssets().slice(0, 6));
+  const [panelIcons] = useState(() => shuffleOrangeAssets().slice(0, 7));
   const [fallingStickers] = useState(() => createFallingStickers(16));
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(() => authState.activeUserId !== null);
   const [error, setError] = useState<string | null>(null);
+  const [accountActionError, setAccountActionError] = useState<string | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
   const [userData, setUserData] = useState<JwtPayload | null>(null);
   const [page, setPage] = useState<'dashboard' | 'settlement'>('dashboard');
-  const [dashboardPanel, setDashboardPanel] = useState<'core' | 'maps' | 'skins' | 'season' | 'tools' | null>(null);
+  const [dashboardPanel, setDashboardPanel] = useState<'core' | 'maps' | 'skins' | 'season' | 'accounts' | 'tools' | null>(null);
+  const [accountCenterRequest, setAccountCenterRequest] = useState<{ tab: 'accounts' | 'jwt'; key: number }>({ tab: 'accounts', key: 0 });
+  const activeProfile = authState.profiles.find((profile) => profile.userId === authState.activeUserId) ?? null;
+  const jwt = activeProfile?.token ?? '';
+
+  const persistAuthState = (nextState: AuthProfileState) => {
+    saveAuthProfileState(localStorage, nextState);
+    setAuthState(nextState);
+  };
+
+  const payloadFromToken = (token: string): JwtPayload => (
+    decodeJwt(token).payload as unknown as JwtPayload
+  );
+
+  const switchProfile = async (userId: string) => {
+    const profile = authState.profiles.find((item) => item.userId === userId);
+    if (!profile) throw new Error('找不到要切换的本地账户');
+
+    try {
+      const nextSettings = await fetchSettings(profile.token);
+      const nextState: AuthProfileState = { ...authState, activeUserId: userId };
+      persistAuthState(nextState);
+      setSettings(nextSettings);
+      setUserData(payloadFromToken(profile.token));
+      setError(null);
+      setAccountActionError(null);
+    } catch (switchError) {
+      const message = switchError instanceof Error ? switchError.message : String(switchError);
+      setAccountActionError(`切换失败：${message}`);
+      throw new Error(`账户校验失败：${message}`);
+    }
+  };
+
+  const saveProfile = async (token: string, makeActive: boolean) => {
+    const profile = profileFromToken(token);
+    const validatedSettings = await fetchSettings(profile.token);
+    const nextState = upsertAuthProfile(authState, profile, makeActive);
+    persistAuthState(nextState);
+    setAccountActionError(null);
+    if (makeActive) {
+      setSettings(validatedSettings);
+      setUserData(payloadFromToken(profile.token));
+      setError(null);
+    }
+  };
+
+  const deleteProfile = (userId: string) => {
+    const deletingActive = authState.activeUserId === userId;
+    const nextState = removeAuthProfile(authState, userId);
+    persistAuthState(nextState);
+    if (deletingActive) {
+      setSettings(null);
+      setUserData(null);
+      setError(null);
+    }
+  };
+
+  const openAccountCenter = (tab: 'accounts' | 'jwt') => {
+    setAccountCenterRequest((current) => ({ tab, key: current.key + 1 }));
+    setPage('dashboard');
+    setDashboardPanel('accounts');
+  };
 
   useEffect(() => {
-    if (jwt) {
-      parseJwt(jwt);
-      loadSettings(jwt);
+    if (!jwt) {
+      setSettings(null);
+      setUserData(null);
+      setLoading(false);
+      return;
     }
+
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    try {
+      setUserData(payloadFromToken(jwt));
+    } catch {
+      setUserData(null);
+    }
+    fetchSettings(jwt)
+      .then((data) => {
+        if (!cancelled) setSettings(data);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setError('认证失败：身份令牌无效或已过期，请切换账户或更新 Token');
+        setSettings(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [jwt]);
 
   useEffect(() => {
     document.body.dataset.theme = theme;
     localStorage.setItem('ui_theme', theme);
   }, [theme]);
-
-  const parseJwt = (token: string) => {
-    try {
-      const payloadBase64 = token.split('.')[1];
-      if (payloadBase64) {
-        const jsonPayload = decodeURIComponent(
-          atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/'))
-            .split('')
-            .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-            .join('')
-        );
-        setUserData(JSON.parse(jsonPayload));
-      }
-    } catch (e) {
-      console.error('JWT Parse Error', e);
-    }
-  };
-
-  const loadSettings = async (token: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await fetchSettings(token);
-      setSettings(data);
-      localStorage.setItem('auth_token', token);
-    } catch (err) {
-      setError('认证失败：身份令牌无效或已过期');
-      setSettings(null);
-      localStorage.removeItem('auth_token');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleUpdate = async (key: keyof Settings, value: any) => {
     if (!settings || !jwt) return;
@@ -1938,48 +2001,33 @@ export function App() {
       minute: '2-digit'
     });
   };
-  const [tempJwt, setTempJwt] = useState<string>('');
-
-  const handleAuthSubmit = (e: Event) => {
-    e.preventDefault();
-    if (tempJwt.trim()) {
-      setJwt(tempJwt.trim());
-    }
-  };
 
   const logout = () => {
-    setJwt('');
+    persistAuthState({ ...authState, activeUserId: null });
     setSettings(null);
     setUserData(null);
-    localStorage.removeItem('auth_token');
+    setError(null);
+    setAccountActionError(null);
   };
 
   const toggleTheme = () => setTheme(prev => prev === 'mono' ? 'pink' : 'mono');
 
   if (!jwt || error) {
     return (
-      <div class="auth-container">
+      <div class="auth-container auth-workspace-container">
         <div class="bg-text bg-text-1">RHODES</div>
-        <div class="cyber-section" style={{ width: '100%', maxWidth: '450px' }}>
+        <div class="cyber-section auth-workspace">
           <h2 class="section-title">身份认证 <span>AUTH_REQUIRED</span></h2>
-          <form onSubmit={handleAuthSubmit} style={{ display: 'grid', gap: '20px' }}>
-            <div class="setting-info">
-              <h3>身份令牌 (JWT)</h3>
-              <p>请输入 PRTS 授权令牌以建立连接</p>
-            </div>
-            <textarea 
-              class="input-field" 
-              style={{ minHeight: '150px', resize: 'none' }}
-              placeholder="请粘贴您的令牌内容..."
-              value={tempJwt}
-              onInput={(e) => setTempJwt(e.currentTarget.value)}
-              required
-            ></textarea>
-            {error && <div style={{ color: '#ff4d4d', fontSize: '0.8rem', textAlign: 'center' }}>{error}</div>}
-            <button class="input-field" style={{ cursor: 'pointer', background: 'var(--color-primary-dim)', fontWeight: 'bold', border: '2px solid var(--color-primary)' }}>
-              {loading ? '建立连接中...' : '开始同步'}
-            </button>
-          </form>
+          {error && <div class="auth-error-banner">{error}</div>}
+          {accountActionError && <div class="auth-error-banner">{accountActionError}</div>}
+          <AccountCenter
+            profiles={authState.profiles}
+            activeUserId={error ? null : authState.activeUserId}
+            initialTab={authState.profiles.length === 0 ? 'jwt' : 'accounts'}
+            onSwitchProfile={switchProfile}
+            onDeleteProfile={deleteProfile}
+            onSaveProfile={saveProfile}
+          />
         </div>
       </div>
     );
@@ -2003,11 +2051,36 @@ export function App() {
 
       <header class="top-header">
         <h1>
-          <img class="title-mascot" src={orangeMemeSrc(panelIcons[5])} alt="" />
+          <img class="title-mascot" src={orangeMemeSrc(panelIcons[6])} alt="" />
           明日方舟·橘戍协议
           <span style={{ fontSize: '0.5rem', opacity: '0.5', fontWeight: '400', marginTop: '2px', display: 'block' }}>TERMINAL_INTERFACE // v2.0.4</span>
         </h1>
         <div class="user-info">
+          <div class="header-account-switch">
+            <span>活动账户</span>
+            <select
+              value={authState.activeUserId ?? ''}
+              disabled={loading}
+              onChange={(event) => {
+                const userId = event.currentTarget.value;
+                if (userId && userId !== authState.activeUserId) {
+                  switchProfile(userId).catch(() => undefined);
+                }
+              }}
+            >
+              {authState.profiles.map((profile) => (
+                <option key={profile.userId} value={profile.userId}>
+                  {profile.nickname || profile.userId}
+                </option>
+              ))}
+            </select>
+            <button type="button" onClick={() => openAccountCenter('accounts')}>
+              管理账户
+            </button>
+            <button type="button" class="new-token" onClick={() => openAccountCenter('jwt')}>
+              登录新 Token
+            </button>
+          </div>
           <div class="info-item">
             <span>Operator</span>
             <span>{userData?.nickname || 'UNKNOWN'}</span>
@@ -2026,9 +2099,10 @@ export function App() {
           </button>
           <div class="info-item" style={{ cursor: 'pointer', opacity: 1, color: '#ff4d4d' }} onClick={logout}>
             <span>Action</span>
-            <span>登出</span>
+            <span>退出当前</span>
           </div>
         </div>
+        {accountActionError && <div class="header-account-error">{accountActionError}</div>}
       </header>
 
       {/* Page Navigation */}
@@ -2080,10 +2154,17 @@ export function App() {
                 onClick={() => setDashboardPanel('season')}
               />
               <SettingsSectionItem
+                title="账户与令牌"
+                code="AUTH_PROFILES"
+                description="保存并切换多个用户，逐用户上传赛季，并在本地生成或解析 JWT。"
+                iconSrc={orangeMemeSrc(panelIcons[4])}
+                onClick={() => openAccountCenter('accounts')}
+              />
+              <SettingsSectionItem
                 title="管理工具"
                 code="ADMIN_TOOLS"
                 description="集中处理作弊控制台、在线队伍操作、快照下载和回滚。"
-                iconSrc={orangeMemeSrc(panelIcons[4])}
+                iconSrc={orangeMemeSrc(panelIcons[5])}
                 onClick={() => setDashboardPanel('tools')}
               />
             </section>
@@ -2258,6 +2339,18 @@ export function App() {
               myUserId={userData?.user_id ?? ''}
               currentSeasonId={settings?.seasonId ?? 'act1autochess'}
               onSeasonChange={(id) => setSettings(s => s ? { ...s, seasonId: id } : s)}
+            />
+          </DashboardDetail>
+          ) : dashboardPanel === 'accounts' ? (
+          <DashboardDetail title="账户与令牌" code="AUTH_PROFILES" onBack={() => setDashboardPanel(null)}>
+            <AccountCenter
+              key={accountCenterRequest.key}
+              profiles={authState.profiles}
+              activeUserId={authState.activeUserId}
+              initialTab={accountCenterRequest.tab}
+              onSwitchProfile={switchProfile}
+              onDeleteProfile={deleteProfile}
+              onSaveProfile={saveProfile}
             />
           </DashboardDetail>
           ) : (
