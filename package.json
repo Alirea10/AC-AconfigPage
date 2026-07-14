@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:local": "vite --host localhost --mode local-server",
     "build": "tsc -b && vite build",
-    "test": "node --test tests/auth.test.ts",
+    "test": "node --test tests/auth.test.ts tests/ban-status-groups.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {
