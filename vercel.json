@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "http://124.71.104.129:7999/:path*"
+      "destination": "http://ark-autochess.microblock.cc:7999/:path*"
     }
   ]
 }
