@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import preact from '@preact/preset-vite'
 
-const REMOTE_API_TARGET = 'http://ark-autochess.microblock.cc:7999'
+const REMOTE_API_TARGET = 'https://ark-autochess.microblock.cc:7998'
 const LOCAL_API_TARGET = 'http://localhost:7999'
 
 // https://vite.dev/config/
