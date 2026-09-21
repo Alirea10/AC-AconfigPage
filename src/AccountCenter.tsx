@@ -2,11 +2,14 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { type SeasonMeta, fetchSeasons, uploadSeason } from './api';
 import type { AuthProfile } from './auth';
 import { JwtTool } from './JwtTool';
+import { TokenLogin } from './TokenLogin';
+
+type AccountCenterTab = 'accounts' | 'token' | 'jwt';
 
 interface AccountCenterProps {
   profiles: AuthProfile[];
   activeUserId: string | null;
-  initialTab?: 'accounts' | 'jwt';
+  initialTab?: AccountCenterTab;
   onSwitchProfile: (userId: string) => Promise<void>;
   onDeleteProfile: (userId: string) => void;
   onSaveProfile: (token: string, makeActive: boolean) => Promise<void>;
@@ -111,8 +114,8 @@ export function AccountCenter({
   onDeleteProfile,
   onSaveProfile,
 }: AccountCenterProps) {
-  const [tab, setTab] = useState<'accounts' | 'jwt'>(
-    initialTab ?? (profiles.length === 0 ? 'jwt' : 'accounts'),
+  const [tab, setTab] = useState<AccountCenterTab>(
+    initialTab ?? (profiles.length === 0 ? 'token' : 'accounts'),
   );
   const [seasons, setSeasons] = useState<SeasonMeta[]>([]);
   const [loading, setLoading] = useState(false);
@@ -157,7 +160,7 @@ export function AccountCenter({
 
   const editProfile = (profile: AuthProfile) => {
     setEditingToken(profile.token);
-    setTab('jwt');
+    setTab('token');
   };
 
   const now = Math.floor(Date.now() / 1000);
@@ -171,8 +174,11 @@ export function AccountCenter({
         <button type="button" class={tab === 'accounts' ? 'active' : ''} onClick={() => setTab('accounts')}>
           已保存账户 <span>{profiles.length}</span>
         </button>
+        <button type="button" class={tab === 'token' ? 'active' : ''} onClick={() => { setEditingToken(''); setTab('token'); }}>
+          Token 登录
+        </button>
         <button type="button" class={tab === 'jwt' ? 'active' : ''} onClick={() => { setEditingToken(''); setTab('jwt'); }}>
-          登录新 Token / JWT 工具
+          JWT 工具（高级）
         </button>
       </div>
 
@@ -184,7 +190,7 @@ export function AccountCenter({
               <p>切换账户会改变整个控制台的当前身份；逐行上传只使用该行 JWT，不会切换账户。</p>
             </div>
             <div class="account-heading-actions">
-              <button type="button" class="primary" onClick={() => { setEditingToken(''); setTab('jwt'); }}>
+              <button type="button" class="primary" onClick={() => { setEditingToken(''); setTab('token'); }}>
                 登录新 Token
               </button>
               <button type="button" onClick={() => loadSeasons()} disabled={loading}>
@@ -198,7 +204,7 @@ export function AccountCenter({
           {profiles.length === 0 ? (
             <div class="account-empty">
               <p>还没有已保存账户。</p>
-              <button type="button" onClick={() => setTab('jwt')}>打开 JWT 工具</button>
+              <button type="button" onClick={() => setTab('token')}>登录 Token</button>
             </div>
           ) : (
             <div class="account-list">
@@ -264,6 +270,12 @@ export function AccountCenter({
             </div>
           )}
         </section>
+      ) : tab === 'token' ? (
+        <TokenLogin
+          key={editingToken || 'new-token'}
+          initialToken={editingToken}
+          onSaveProfile={onSaveProfile}
+        />
       ) : (
         <JwtTool
           key={editingToken || 'new-token'}

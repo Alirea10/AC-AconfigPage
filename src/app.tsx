@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
-import { ArrowLeft20Regular, ChevronRight20Regular, Heart20Regular, WeatherSunny20Regular } from '@fluentui/react-icons';
+import { ArrowLeft20Regular, ChevronRight20Regular, Heart20Regular, WeatherMoon20Regular, WeatherSunny20Regular } from '@fluentui/react-icons';
 import './app.css';
 import { type Settings, type SeasonMeta, fetchSettings, updateSetting, fetchSeasons, uploadSeason, deleteSeason, fetchCheatStatus, subscribeCheatStatus, fetchChessList, executeCheatAction, kickPlayer, type CheatConnection, type ChessItem, type BondItem, fetchTeams, fetchSnapshots, rollbackToSnapshot, downloadSnapshot, importSnapshot, type TeamInfo, type SnapshotMeta } from './api';
 import { CHARACTER_NAME_MAP, MAPS, NAME_CARDS } from './constants';
@@ -19,9 +19,27 @@ import {
 } from './auth';
 
 const ORANGE_ASSETS = ['4', '6', '7', '10', '15', '18', '19', '20', '25', '28', '33', '36'];
+const SUZURAN_ASSETS = [
+  '1',
+  '2',
+  '3',
+  '4',
+  '5',
+  '6',
+  '7',
+  '8',
+  '9',
+];
 
-function shuffleOrangeAssets() {
-  const items = [...ORANGE_ASSETS];
+type Theme = 'mono' | 'pink' | 'yellow';
+
+function loadInitialTheme(): Theme {
+  const savedTheme = localStorage.getItem('ui_theme');
+  return savedTheme === 'mono' || savedTheme === 'pink' || savedTheme === 'yellow' ? savedTheme : 'pink';
+}
+
+function shuffleAssets(assets: readonly string[]) {
+  const items = [...assets];
   for (let i = items.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1));
     [items[i], items[j]] = [items[j], items[i]];
@@ -29,12 +47,12 @@ function shuffleOrangeAssets() {
   return items;
 }
 
-function orangeMemeSrc(name: string) {
-  return `/orange/${name}.webp`;
+function themeMemeSrc(theme: Theme, name: string) {
+  return theme === 'yellow' ? `/suzuran/${name}.webp` : `/orange/${name}.webp`;
 }
 
-function createFallingStickers(count: number) {
-  const shuffled = shuffleOrangeAssets();
+function createFallingStickers(count: number, theme: Theme, assets: readonly string[]) {
+  const shuffled = shuffleAssets(assets);
   return Array.from({ length: count }, (_, i) => {
     const name = shuffled[i % shuffled.length];
     const laneWidth = 100 / count;
@@ -45,8 +63,8 @@ function createFallingStickers(count: number) {
     const rotate = Math.max(-75, Math.min(75, baseAngles[band] + Math.round((Math.random() - 0.5) * 18)));
     const spin = (i % 2 === 0 ? 1 : -1) * Math.round(34 + Math.random() * 28);
     return {
-      id: `${name}-${i}`,
-      src: `/orange/${name}.webp`,
+      id: `${theme}-${name}-${i}`,
+      src: themeMemeSrc(theme, name),
       left: Number(Math.max(2, Math.min(94, laneCenter + jitter)).toFixed(2)),
       size: Math.round(74 + Math.random() * 78),
       rotate,
@@ -76,7 +94,7 @@ function limitVector(x: number, y: number, max: number) {
   return { x: x * scale, y: y * scale };
 }
 
-function OrangeStickerLayer({ stickers, active }: { stickers: FallingSticker[]; active: boolean }) {
+function ThemeStickerLayer({ stickers, active }: { stickers: FallingSticker[]; active: boolean }) {
   const motionRefs = useRef<(HTMLSpanElement | null)[]>([]);
   const particlesRef = useRef<Array<{
     x: number;
@@ -326,19 +344,19 @@ function OrangeStickerLayer({ stickers, active }: { stickers: FallingSticker[]; 
   }, []);
 
   return (
-    <div class="orange-sticker-layer" aria-hidden="true">
+    <div class="theme-sticker-layer" aria-hidden="true">
       {stickers.map((sticker, index) => (
         <span
           key={sticker.id}
           ref={(node) => { motionRefs.current[index] = node; }}
-          class="orange-sticker-motion"
+          class="theme-sticker-motion"
           style={{
             width: `${sticker.size}px`,
             '--sticker-opacity': sticker.opacity,
           } as preact.JSX.CSSProperties}
         >
           <img
-            class="orange-sticker"
+            class="theme-sticker"
             src={sticker.src}
             alt=""
           />
@@ -443,15 +461,17 @@ function DashboardDetail({
 }: {
   title: preact.ComponentChildren;
   code?: preact.ComponentChildren;
-  onBack: () => void;
+  onBack?: () => void;
   children: preact.ComponentChildren;
 }) {
   return (
     <section class="cyber-section dashboard-detail dashboard-panel">
-      <button type="button" class="detail-back" onClick={onBack}>
-        <ArrowLeft20Regular />
-        <span>返回</span>
-      </button>
+      {onBack && (
+        <button type="button" class="detail-back" onClick={onBack}>
+          <ArrowLeft20Regular />
+          <span>返回</span>
+        </button>
+      )}
       <div class="detail-header">
         <h2>{title}</h2>
         {code && <span>{code}</span>}
@@ -1016,10 +1036,8 @@ function CheatConsole({ jwt }: { jwt: string }) {
         </div>
         <div class="admin-danger-actions">
           <button type="button" disabled={actionLoading === 'forceend'} onClick={() => doAction('forceend', 'FORCE_END_PHASE')}>结束当前阶段</button>
-          <button type="button" disabled={actionLoading === 'forcelogin'} onClick={() => doAction('forcelogin', 'FORCE_LOGIN')}>退回登录页</button>
           <button type="button" disabled={actionLoading === 'dissolve'} onClick={() => doAction('dissolve', 'DISSOLVE_TEAM')}>解散队伍</button>
           <Result k="forceend" />
-          <Result k="forcelogin" />
           <Result k="dissolve" />
         </div>
       </section>
@@ -1844,20 +1862,27 @@ export function SnapshotRollback({ jwt }: { jwt: string }) {
 
 export function App() {
   const [authState, setAuthState] = useState<AuthProfileState>(() => loadAuthProfileState(localStorage));
-  const [theme, setTheme] = useState<'mono' | 'pink'>((localStorage.getItem('ui_theme') as 'mono' | 'pink') || 'pink');
-  const [panelIcons] = useState(() => shuffleOrangeAssets().slice(0, 7));
-  const [fallingStickers] = useState(() => createFallingStickers(16));
+  const [theme, setTheme] = useState<Theme>(loadInitialTheme);
+  const [pinkPanelIcons] = useState(() => shuffleAssets(ORANGE_ASSETS).slice(0, 7));
+  const [yellowPanelIcons] = useState(() => shuffleAssets(SUZURAN_ASSETS).slice(0, 7));
+  const [pinkFallingStickers] = useState(() => createFallingStickers(16, 'pink', ORANGE_ASSETS));
+  const [yellowFallingStickers] = useState(() => createFallingStickers(16, 'yellow', SUZURAN_ASSETS));
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(() => authState.activeUserId !== null);
   const [error, setError] = useState<string | null>(null);
   const [accountActionError, setAccountActionError] = useState<string | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
   const [userData, setUserData] = useState<JwtPayload | null>(null);
-  const [page, setPage] = useState<'dashboard' | 'settlement'>('dashboard');
-  const [dashboardPanel, setDashboardPanel] = useState<'core' | 'maps' | 'skins' | 'season' | 'accounts' | 'tools' | null>(null);
-  const [accountCenterRequest, setAccountCenterRequest] = useState<{ tab: 'accounts' | 'jwt'; key: number }>({ tab: 'accounts', key: 0 });
+  const [page, setPage] = useState<'dashboard' | 'tools' | 'settlement'>('dashboard');
+  const [dashboardPanel, setDashboardPanel] = useState<'core' | 'maps' | 'skins' | 'season' | 'accounts' | null>(null);
+  const [accountCenterRequest, setAccountCenterRequest] = useState<{ tab: 'accounts' | 'token' | 'jwt'; key: number }>({ tab: 'accounts', key: 0 });
+  const [clientLoginAction, setClientLoginAction] = useState<{ busy: boolean; ok: boolean; message: string }>(
+    { busy: false, ok: true, message: '' },
+  );
   const activeProfile = authState.profiles.find((profile) => profile.userId === authState.activeUserId) ?? null;
   const jwt = activeProfile?.token ?? '';
+  const panelIcons = theme === 'yellow' ? yellowPanelIcons : pinkPanelIcons;
+  const fallingStickers = theme === 'yellow' ? yellowFallingStickers : pinkFallingStickers;
 
   const persistAuthState = (nextState: AuthProfileState) => {
     saveAuthProfileState(localStorage, nextState);
@@ -1911,7 +1936,7 @@ export function App() {
     }
   };
 
-  const openAccountCenter = (tab: 'accounts' | 'jwt') => {
+  const openAccountCenter = (tab: 'accounts' | 'token' | 'jwt') => {
     setAccountCenterRequest((current) => ({ tab, key: current.key + 1 }));
     setPage('dashboard');
     setDashboardPanel('accounts');
@@ -1954,6 +1979,7 @@ export function App() {
   useEffect(() => {
     document.body.dataset.theme = theme;
     localStorage.setItem('ui_theme', theme);
+    document.getElementById('favicon')?.setAttribute('href', themeMemeSrc(theme, panelIcons[0]));
   }, [theme]);
 
   const handleUpdate = async (key: keyof Settings, value: any) => {
@@ -2008,9 +2034,26 @@ export function App() {
     setUserData(null);
     setError(null);
     setAccountActionError(null);
+    setClientLoginAction({ busy: false, ok: true, message: '' });
   };
 
-  const toggleTheme = () => setTheme(prev => prev === 'mono' ? 'pink' : 'mono');
+  const forceClientBackToLogin = async () => {
+    setClientLoginAction({ busy: true, ok: true, message: '' });
+    try {
+      const result = await executeCheatAction(jwt, 'FORCE_LOGIN');
+      setClientLoginAction({ busy: false, ok: true, message: result.message });
+    } catch (actionError) {
+      setClientLoginAction({
+        busy: false,
+        ok: false,
+        message: actionError instanceof Error ? actionError.message : String(actionError),
+      });
+    }
+  };
+
+  const toggleTheme = () => setTheme((previous) => (
+    previous === 'pink' ? 'yellow' : previous === 'yellow' ? 'mono' : 'pink'
+  ));
 
   if (!jwt || error) {
     return (
@@ -2023,7 +2066,7 @@ export function App() {
           <AccountCenter
             profiles={authState.profiles}
             activeUserId={error ? null : authState.activeUserId}
-            initialTab={authState.profiles.length === 0 ? 'jwt' : 'accounts'}
+            initialTab={authState.profiles.length === 0 ? 'token' : 'accounts'}
             onSwitchProfile={switchProfile}
             onDeleteProfile={deleteProfile}
             onSaveProfile={saveProfile}
@@ -2037,7 +2080,7 @@ export function App() {
     return (
       <div class="loading-screen">
         <div class="spinner"></div>
-        <img class="loading-meme" src={orangeMemeSrc(panelIcons[0])} alt="" />
+        <img class="loading-meme" src={themeMemeSrc(theme, panelIcons[0])} alt="" />
         <div style={{ letterSpacing: '4px', fontSize: '0.8rem', marginTop: '20px' }}>PRTS_SYNCING...</div>
       </div>
     );
@@ -2047,12 +2090,12 @@ export function App() {
     <>
       <div class="bg-text bg-text-1">RHODES</div>
       <div class="bg-text bg-text-2">ISLAND</div>
-      <OrangeStickerLayer stickers={fallingStickers} active={theme === 'pink'} />
+      <ThemeStickerLayer stickers={fallingStickers} active={theme !== 'mono'} />
 
       <header class="top-header">
         <h1>
-          <img class="title-mascot" src={orangeMemeSrc(panelIcons[6])} alt="" />
-          明日方舟·橘戍协议
+          <img class="title-mascot" src={themeMemeSrc(theme, panelIcons[6])} alt="" />
+          {theme === 'yellow' ? '明日方舟·铃兰协议' : '明日方舟·橘戍协议'}
           <span style={{ fontSize: '0.5rem', opacity: '0.5', fontWeight: '400', marginTop: '2px', display: 'block' }}>TERMINAL_INTERFACE // v2.0.4</span>
         </h1>
         <div class="user-info">
@@ -2077,7 +2120,7 @@ export function App() {
             <button type="button" onClick={() => openAccountCenter('accounts')}>
               管理账户
             </button>
-            <button type="button" class="new-token" onClick={() => openAccountCenter('jwt')}>
+            <button type="button" class="new-token" onClick={() => openAccountCenter('token')}>
               登录新 Token
             </button>
           </div>
@@ -2094,8 +2137,8 @@ export function App() {
             <span>{formatTime(userData?.exp)}</span>
           </div>
           <button class="theme-toggle" type="button" onClick={toggleTheme} aria-label="切换主题">
-            {theme === 'pink' ? <Heart20Regular /> : <WeatherSunny20Regular />}
-            <span>{theme === 'pink' ? '粉色主题' : '黑白主题'}</span>
+            {theme === 'pink' ? <Heart20Regular /> : theme === 'yellow' ? <WeatherSunny20Regular /> : <WeatherMoon20Regular />}
+            <span>{theme === 'pink' ? '粉色主题' : theme === 'yellow' ? '黄色主题' : '黑白主题'}</span>
           </button>
           <div class="info-item" style={{ cursor: 'pointer', opacity: 1, color: '#ff4d4d' }} onClick={logout}>
             <span>Action</span>
@@ -2114,11 +2157,30 @@ export function App() {
           控制面板 <span>DASHBOARD</span>
         </button>
         <button
+          class={`page-nav-btn ${page === 'tools' ? 'active' : ''}`}
+          onClick={() => { setPage('tools'); setDashboardPanel(null); }}
+        >
+          管理工具 <span>ADMIN_TOOLS</span>
+        </button>
+        <button
           class={`page-nav-btn ${page === 'settlement' ? 'active' : ''}`}
           onClick={() => setPage('settlement')}
         >
           结算统计 <span>SETTLEMENT</span>
         </button>
+        <button
+          class="page-nav-client-action"
+          type="button"
+          disabled={clientLoginAction.busy}
+          onClick={() => { void forceClientBackToLogin(); }}
+        >
+          {clientLoginAction.busy ? '正在退出游戏' : '游戏退回登录页'}
+        </button>
+        {clientLoginAction.message && (
+          <span class={`page-nav-client-message ${clientLoginAction.ok ? 'ok' : 'bad'}`}>
+            {clientLoginAction.message}
+          </span>
+        )}
       </nav>
 
       {page === 'dashboard' ? (
@@ -2129,43 +2191,36 @@ export function App() {
                 title="核心参数"
                 code="CORE_V1.0"
                 description="配置回合限时、共享池、公开权限、人数上限、重复盟约和助理干员。"
-                iconSrc={orangeMemeSrc(panelIcons[0])}
+                iconSrc={themeMemeSrc(theme, panelIcons[0])}
                 onClick={() => setDashboardPanel('core')}
               />
               <SettingsSectionItem
                 title="授权战区地图"
                 code="MAP_AUTH"
                 description="选择当前房间允许出现的地图池。"
-                iconSrc={orangeMemeSrc(panelIcons[1])}
+                iconSrc={themeMemeSrc(theme, panelIcons[1])}
                 onClick={() => setDashboardPanel('maps')}
               />
               <SettingsSectionItem
                 title="身份标识涂装"
                 code="ID_SKINS"
                 description="切换房间使用的身份牌和展示外观。"
-                iconSrc={orangeMemeSrc(panelIcons[2])}
+                iconSrc={themeMemeSrc(theme, panelIcons[2])}
                 onClick={() => setDashboardPanel('skins')}
               />
               <SettingsSectionItem
                 title="赛季管理"
                 code="SEASON_MGR"
                 description="查看内置赛季、启用赛季版本，并上传或替换自定义赛季。"
-                iconSrc={orangeMemeSrc(panelIcons[3])}
+                iconSrc={themeMemeSrc(theme, panelIcons[3])}
                 onClick={() => setDashboardPanel('season')}
               />
               <SettingsSectionItem
                 title="账户与令牌"
                 code="AUTH_PROFILES"
                 description="保存并切换多个用户，逐用户上传赛季，并在本地生成或解析 JWT。"
-                iconSrc={orangeMemeSrc(panelIcons[4])}
+                iconSrc={themeMemeSrc(theme, panelIcons[4])}
                 onClick={() => openAccountCenter('accounts')}
-              />
-              <SettingsSectionItem
-                title="管理工具"
-                code="ADMIN_TOOLS"
-                description="集中处理作弊控制台、在线队伍操作、快照下载和回滚。"
-                iconSrc={orangeMemeSrc(panelIcons[5])}
-                onClick={() => setDashboardPanel('tools')}
               />
             </section>
           ) : dashboardPanel === 'core' ? (
@@ -2353,11 +2408,13 @@ export function App() {
               onSaveProfile={saveProfile}
             />
           </DashboardDetail>
-          ) : (
-          <DashboardDetail title="管理工具" code="ADMIN_TOOLS" onBack={() => setDashboardPanel(null)}>
+          ) : null}
+        </div>
+      ) : page === 'tools' ? (
+        <div class="container dashboard-container">
+          <DashboardDetail title="管理工具" code="ADMIN_TOOLS">
             <CheatConsole jwt={jwt} />
           </DashboardDetail>
-          )}
         </div>
       ) : (
         <div class="container container-wide">
