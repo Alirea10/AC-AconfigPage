@@ -225,7 +225,7 @@ export function JwtTool({ initialToken = '', onSaveProfile }: JwtToolProps) {
   const [showSecret, setShowSecret] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
-  const cryptoSupported = !!globalThis.crypto?.subtle;
+  const usesWebCrypto = !!globalThis.crypto?.subtle;
 
   const setPayloadAndSyncUsername = (fields: JsonFieldEntry[]) => {
     setPayloadFields(fields);
@@ -434,15 +434,15 @@ export function JwtTool({ initialToken = '', onSaveProfile }: JwtToolProps) {
             </div>
           </label>
 
-          {!cryptoSupported && (
-            <div class="jwt-message bad">当前来源不支持 Web Crypto；解码可用，签名与验证需要 HTTPS 或 localhost。</div>
+          {!usesWebCrypto && (
+            <div class="jwt-message">当前为 HTTP，将使用本地兼容签名实现；密钥和 JWT 不会上传。</div>
           )}
 
           <div class="jwt-toolbar signature-actions">
-            <button type="submit" class="primary" disabled={!!busy || !cryptoSupported}>
+            <button type="submit" class="primary" disabled={!!busy}>
               {busy === 'sign' ? '签名中' : '生成 / 重新签名'}
             </button>
-            <button type="button" onClick={handleVerify} disabled={!!busy || !cryptoSupported || !encodedToken.trim()}>
+            <button type="button" onClick={handleVerify} disabled={!!busy || !encodedToken.trim()}>
               {busy === 'verify' ? '验证中' : '验证签名'}
             </button>
           </div>
