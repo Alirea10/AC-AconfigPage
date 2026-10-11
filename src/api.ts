@@ -98,15 +98,19 @@ export interface CheatPlayer {
   charChessCount: number;
   bondStacks: Record<string, number>;
   state: string | null;
+  isEliminated?: boolean;
 }
 
 export interface CheatConnection {
+  requestUserId?: string;
   userId: string | null;
   nickname: string | null;
   teamId: string;
   teamState: string;
   inBattle: boolean;
   round: number | null;
+  sceneState?: string | null;
+  seasonHash?: string;
   isAdmin: boolean;
   players: CheatPlayer[];
   /** 后端尚未接入时缺失；接入后通过 status 查询和 SSE 实时返回。 */
@@ -135,7 +139,38 @@ export interface BondItem {
   identifier: number;
 }
 
-export type CheatAction = 'SET_COIN' | 'SET_HP' | 'SET_ROUND' | 'SET_BOND_STACK' | 'ADD_CHESS' | 'FORCE_END_PHASE' | 'FORCE_LOGIN' | 'DISSOLVE_TEAM';
+export type CheatAction = 'SET_COIN' | 'SET_HP' | 'SET_ROUND' | 'SET_BOND_STACK' | 'ADD_CHESS' | 'ADD_BOUNTY' | 'FORCE_END_PHASE' | 'FORCE_LOGIN' | 'DISSOLVE_TEAM';
+
+export interface BountyItem {
+  effectId: string;
+  name: string;
+  description: string;
+  price: number;
+  selectable: boolean;
+  unavailableReason: string | null;
+  spawns: Array<{
+    enemyId: string;
+    count: number;
+    coin: number;
+    rounds: number;
+    rewardType: 'kill' | 'win';
+  }>;
+}
+
+export interface BountyCatalog {
+  season: { seasonId: string; effectiveHash: string };
+  targetRound: number | null;
+  bounties: BountyItem[];
+}
+
+export const fetchBountyList = async (jwt: string, teamId: string): Promise<BountyCatalog> => {
+  const response = await fetch(`${BASE_URL}/cheat/bounty-list?jwt=${encodeURIComponent(jwt)}&teamId=${encodeURIComponent(teamId)}`);
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(err.error || '悬赏列表读取失败');
+  }
+  return response.json();
+};
 
 /** 获取所有在线连接及其战斗状态 */
 export const fetchCheatStatus = async (jwt: string): Promise<CheatConnection[]> => {

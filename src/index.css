@@ -823,6 +823,48 @@ body[data-theme="pink"] .detail-back {
   gap: 10px;
 }
 
+.admin-bounty-target,
+.admin-bounty-target label {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.admin-bounty-target {
+  margin-bottom: 16px;
+  font-size: 0.8rem;
+}
+
+.admin-bounty-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(0, 1.3fr);
+  gap: 20px;
+}
+
+.admin-bounty-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.admin-bounty-description {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.admin-bounty-detail ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+@media (max-width: 720px) {
+  .admin-bounty-layout { grid-template-columns: 1fr; }
+}
+
 .admin-chess-results {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

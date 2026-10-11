@@ -7,6 +7,7 @@ import { SecretarySelector } from './SecretarySelector';
 import { SettlementView } from './SettlementView';
 import { AccountCenter } from './AccountCenter';
 import { BanStatusPanel } from './BanStatusPanel';
+import { BountyPanel } from './BountyPanel';
 import {
   type AuthProfileState,
   type JwtPayload,
@@ -1028,6 +1029,8 @@ function CheatConsole({ jwt }: { jwt: string }) {
           </div>
         </section>
       </div>
+
+      <BountyPanel key={selectedTeam} jwt={jwt} connection={selectedConn} onChanged={poll} />
 
       <section class="admin-command-panel">
         <div class="admin-panel-title">
