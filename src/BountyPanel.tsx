@@ -108,17 +108,8 @@ export function BountyPanel({ jwt, connection, onChanged }: {
           {selected ? <>
             <strong>{plainText(selected.name)}</strong>
             <p class="admin-bounty-description">{plainText(selected.description)}</p>
-            <span>赛季选择费用：{selected.price} 资金；本工具免费，持续次数覆盖为一次。</span>
-            <ul>
-              {selected.spawns.map((s, i) => <li key={i}>
-                <code>{s.enemyId}</code> × {s.count}：
-                {s.rewardType === 'kill' ? '击倒者获得' : '本人行动阶段完美作战获得'} {s.coin} 资金／只，
-                合计 {s.count * s.coin} 资金
-              </li>)}
-            </ul>
-            <strong>理论奖励合计：{selected.spawns.reduce((sum, s) => sum + s.count * s.coin, 0)} 资金</strong>
             {selected.unavailableReason && <p class="admin-result bad">{selected.unavailableReason}</p>}
-          </> : <span>请选择悬赏查看敌人和资金奖励。</span>}
+          </> : <span>请选择悬赏查看描述。</span>}
           <button type="button" disabled={saving || loading || !selected?.selectable || !target || !connection.inBattle}
             onClick={add}>{saving ? '添加中' : '添加到下一场普通战斗'}</button>
           {result && <span class={`admin-result ${result.ok ? 'ok' : 'bad'}`} role="status">{result.text}</span>}

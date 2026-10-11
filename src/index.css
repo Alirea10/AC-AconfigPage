@@ -856,11 +856,6 @@ body[data-theme="pink"] .detail-back {
   white-space: pre-wrap;
 }
 
-.admin-bounty-detail ul {
-  margin: 0;
-  padding-left: 20px;
-}
-
 @media (max-width: 720px) {
   .admin-bounty-layout { grid-template-columns: 1fr; }
 }
