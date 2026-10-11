@@ -12,6 +12,7 @@ export interface TurnTimeLimitSettings {
 export interface Settings {
   turnTimeLimitSettings: TurnTimeLimitSettings;
   isSharedPoolEnabled: boolean;
+  immediateDeathEnabled: boolean;
   enabledMaps: string[];
   nameCardSkinId: string;
   secretary: string;

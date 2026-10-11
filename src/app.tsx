@@ -2294,6 +2294,25 @@ export function App() {
 
             <div class="setting-item">
               <div class="setting-info">
+                <h3>立即死亡模式</h3>
+                <p>结算后生命值低于 0 时立即失败，仅可观战；采用房主设置，下一局生效</p>
+              </div>
+              <div class="switch-card compact">
+                <label class="switch">
+                  <input
+                    type="checkbox"
+                    aria-label="立即死亡模式"
+                    checked={settings?.immediateDeathEnabled ?? false}
+                    onChange={(e) => handleUpdate('immediateDeathEnabled', e.currentTarget.checked)}
+                    disabled={!!updating}
+                  />
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="setting-item">
+              <div class="setting-info">
                 <h3>公开访问权限</h3>
                 <p>是否在大厅公开广播</p>
               </div>
